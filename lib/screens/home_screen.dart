@@ -1,29 +1,23 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../providers/led_provider.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../bloc/app_bloc.dart';
+import '../bloc/led_bloc.dart';
+import '../bloc/navigation_bloc.dart';
+import '../models/led_state.dart';
 import '../services/mqtt_service.dart';
 import '../theme/app_theme.dart';
-import '../models/led_state.dart';
+import '../widgets/app_widgets.dart';
+import 'ai_chat_screen.dart';
 import 'color_picker_screen.dart';
 import 'effects_screen.dart';
-import 'ai_chat_screen.dart';
 import 'sensor_screen.dart';
 import 'settings_screen.dart';
 
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
-  @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
-
-class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
-  int _currentIndex = 0;
-  late AnimationController _pulseController;
-  late Animation<double> _pulseAnimation;
-
-  final List<Widget> _screens = const [
-    _DashboardView(),
+  static const _screens = [
+    DashboardScreen(),
     ColorPickerScreen(),
     EffectsScreen(),
     AiChatScreen(),
@@ -31,563 +25,340 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   ];
 
   @override
-  void initState() {
-    super.initState();
-    _pulseController = AnimationController(
-      duration: const Duration(seconds: 2),
-      vsync: this,
-    )..repeat(reverse: true);
-    _pulseAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
-    );
-  }
-
-  @override
-  void dispose() {
-    _pulseController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 300),
-        child: _screens[_currentIndex],
-      ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: AppTheme.surfaceDark,
-          border: Border(
-            top: BorderSide(color: AppTheme.borderDark.withOpacity(0.5)),
+  Widget build(BuildContext context) =>
+      BlocBuilder<NavigationBloc, NavigationState>(
+        builder: (context, navigation) => Scaffold(
+          body: IndexedStack(index: navigation.index, children: _screens),
+          bottomNavigationBar: NavigationBar(
+            selectedIndex: navigation.index,
+            onDestinationSelected: (index) => context
+                .read<NavigationBloc>()
+                .add(NavigationTabSelected(index)),
+            destinations: const [
+              NavigationDestination(
+                  icon: Icon(Icons.dashboard_outlined),
+                  selectedIcon: Icon(Icons.dashboard_rounded),
+                  label: 'Tổng quan'),
+              NavigationDestination(
+                  icon: Icon(Icons.palette_outlined),
+                  selectedIcon: Icon(Icons.palette_rounded),
+                  label: 'Màu sắc'),
+              NavigationDestination(
+                  icon: Icon(Icons.auto_awesome_outlined),
+                  selectedIcon: Icon(Icons.auto_awesome_rounded),
+                  label: 'Hiệu ứng'),
+              NavigationDestination(
+                  icon: Icon(Icons.smart_toy_outlined),
+                  selectedIcon: Icon(Icons.smart_toy_rounded),
+                  label: 'Trợ lý'),
+              NavigationDestination(
+                  icon: Icon(Icons.sensors_outlined),
+                  selectedIcon: Icon(Icons.sensors_rounded),
+                  label: 'Cảm biến'),
+            ],
           ),
         ),
-        child: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          onTap: (i) => setState(() => _currentIndex = i),
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.dashboard_rounded),
-              label: 'Trang chủ',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.palette_rounded),
-              label: 'Màu sắc',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.auto_awesome_rounded),
-              label: 'Hiệu ứng',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.smart_toy_rounded),
-              label: 'AI',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.sensors_rounded),
-              label: 'Cảm biến',
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+      );
 }
 
-class _DashboardView extends StatelessWidget {
-  const _DashboardView();
+class DashboardScreen extends StatelessWidget {
+  const DashboardScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final mqtt = context.watch<MqttService>();
-    final led = context.watch<LedProvider>();
-    final state = led.ledState;
-
-    return SafeArea(
-      child: CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Header
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Smart LED',
-                            style: Theme.of(context)
-                                .textTheme
-                                .headlineMedium
-                                ?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.textPrimary,
-                                ),
-                          ),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              Container(
-                                width: 8,
-                                height: 8,
-                                decoration: BoxDecoration(
-                                  color: mqtt.isConnected
-                                      ? AppTheme.accentGreen
-                                      : AppTheme.accentRed,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                mqtt.isConnected
-                                    ? 'Đã kết nối'
-                                    : 'Chưa kết nối',
-                                style: TextStyle(
-                                  color: mqtt.isConnected
-                                      ? AppTheme.accentGreen
-                                      : AppTheme.textSecondary,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                      IconButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const SettingsScreen(),
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.settings_rounded),
-                        style: IconButton.styleFrom(
-                          backgroundColor: AppTheme.cardDark,
-                          padding: const EdgeInsets.all(12),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Power switch card
-                  _GlassCard(
-                    gradient: state.isOn
-                        ? LinearGradient(
-                            colors: [
-                              Color.fromRGBO(
-                                state.color.red,
-                                state.color.green,
-                                state.color.blue,
-                                0.3,
-                              ),
-                              Color.fromRGBO(
-                                state.color.red,
-                                state.color.green,
-                                state.color.blue,
-                                0.1,
-                              ),
-                            ],
-                          )
-                        : null,
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 60,
-                          height: 60,
-                          decoration: BoxDecoration(
-                            gradient: state.isOn
-                                ? LinearGradient(
-                                    colors: [
-                                      state.color.withOpacity(0.8),
-                                      state.color.withOpacity(0.4),
-                                    ],
-                                  )
-                                : null,
-                            color: state.isOn ? null : AppTheme.cardDark,
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Icon(
-                            state.isOn
-                                ? Icons.lightbulb_rounded
-                                : Icons.lightbulb_outline_rounded,
-                            color: state.isOn
-                                ? Colors.white
-                                : AppTheme.textSecondary,
-                            size: 30,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                state.isOn ? 'Đèn đang bật' : 'Đèn đang tắt',
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Độ sáng: ${state.brightness}% • ${state.effect.displayName}',
-                                style: const TextStyle(
-                                  color: AppTheme.textSecondary,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Transform.scale(
-                          scale: 1.2,
-                          child: Switch(
-                            value: state.isOn,
-                            onChanged: (v) => led.togglePower(v),
-                            activeColor: AppTheme.accentBlue,
-                            activeTrackColor:
-                                AppTheme.accentBlue.withOpacity(0.3),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Brightness slider
-                  _GlassCard(
-                    child: Column(
+  Widget build(BuildContext context) => BlocListener<LedBloc, LedBlocState>(
+        listenWhen: (previous, current) =>
+            previous.errorMessage != current.errorMessage &&
+            current.errorMessage != null,
+        listener: (context, state) {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text(state.errorMessage!)));
+          context.read<LedBloc>().add(const LedErrorCleared());
+        },
+        child: SafeArea(
+          child: BlocBuilder<AppBloc, AppState>(
+            builder: (context, app) => BlocBuilder<LedBloc, LedBlocState>(
+              builder: (context, led) => SingleChildScrollView(
+                child: ResponsiveContent(
+                  child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Row(
-                              children: [
-                                Icon(Icons.brightness_6_rounded, size: 20),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Độ sáng',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 4,
+                        ScreenHeader(
+                          title: 'Smart LED',
+                          subtitle:
+                              'Điều khiển ánh sáng và theo dõi không gian',
+                          trailing: IconButton.filledTonal(
+                            tooltip: 'Mở cài đặt',
+                            onPressed: () => Navigator.of(context).push(
+                                MaterialPageRoute(
+                                    builder: (_) => const SettingsScreen())),
+                            icon: const Icon(Icons.settings_rounded),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        _ConnectionBanner(app: app),
+                        const SizedBox(height: 16),
+                        _PowerCard(state: led, enabled: app.isConnected),
+                        const SizedBox(height: 16),
+                        _BrightnessCard(state: led, enabled: app.isConnected),
+                        const SizedBox(height: 24),
+                        const SectionTitle('Điều khiển nhanh'),
+                        const SizedBox(height: 12),
+                        LayoutBuilder(builder: (context, constraints) {
+                          final columns = constraints.maxWidth >= 720 ? 4 : 2;
+                          return GridView.count(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            crossAxisCount: columns,
+                            mainAxisSpacing: 12,
+                            crossAxisSpacing: 12,
+                            childAspectRatio: columns == 4 ? 1.35 : 1.5,
+                            children: [
+                              _QuickAction(
+                                  icon: Icons.palette_rounded,
+                                  label: 'Chọn màu',
+                                  value: _colorName(led.led.color),
+                                  onTap: () => _openTab(context, 1)),
+                              _QuickAction(
+                                  icon: Icons.auto_awesome_rounded,
+                                  label: 'Hiệu ứng',
+                                  value: led.led.effect.displayName,
+                                  onTap: () => _openTab(context, 2)),
+                              _QuickAction(
+                                icon: Icons.auto_mode_rounded,
+                                label: 'Tự động',
+                                value: led.autoMode ? 'Đang bật' : 'Đang tắt',
+                                onTap: app.isConnected
+                                    ? () => context
+                                        .read<LedBloc>()
+                                        .add(LedAutoModeChanged(!led.autoMode))
+                                    : null,
                               ),
-                              decoration: BoxDecoration(
-                                color: AppTheme.accentBlue.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(20),
+                              _QuickAction(
+                                icon: Icons.light_mode_rounded,
+                                label: 'Ánh sáng',
+                                value:
+                                    '${led.sensor.lightIntensity.toStringAsFixed(0)} lux',
+                                onTap: () => _openTab(context, 4),
                               ),
-                              child: Text(
-                                '${state.brightness}%',
-                                style: const TextStyle(
-                                  color: AppTheme.accentBlue,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
+                            ],
+                          );
+                        }),
+                        const SizedBox(height: 24),
+                        const SectionTitle('Màu nhanh'),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 12,
+                          children: const [
+                            _PresetColor(label: 'Đỏ', color: Color(0xFFEF4444)),
+                            _PresetColor(
+                                label: 'Xanh lá', color: Color(0xFF22C55E)),
+                            _PresetColor(
+                                label: 'Xanh dương', color: Color(0xFF3B82F6)),
+                            _PresetColor(
+                                label: 'Vàng', color: Color(0xFFFACC15)),
+                            _PresetColor(
+                                label: 'Tím', color: Color(0xFFA855F7)),
+                            _PresetColor(label: 'Ấm', color: Color(0xFFFFB464)),
                           ],
                         ),
-                        const SizedBox(height: 12),
-                        SliderTheme(
-                          data: SliderThemeData(
-                            activeTrackColor: AppTheme.accentBlue,
-                            inactiveTrackColor:
-                                AppTheme.accentBlue.withOpacity(0.15),
-                            thumbColor: Colors.white,
-                            overlayColor:
-                                AppTheme.accentBlue.withOpacity(0.15),
-                            trackHeight: 6,
-                          ),
-                          child: Slider(
-                            value: state.brightness.toDouble(),
-                            min: 0,
-                            max: 100,
-                            onChanged: (v) => led.setBrightness(v.toInt()),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Quick actions grid
-                  Text(
-                    'Thao tác nhanh',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                  ),
-                  const SizedBox(height: 12),
-                  GridView.count(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    crossAxisCount: 2,
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
-                    childAspectRatio: 1.6,
-                    children: [
-                      _QuickActionCard(
-                        icon: Icons.palette_rounded,
-                        label: 'Chọn màu',
-                        gradient: AppTheme.primaryGradient,
-                        onTap: () {
-                          // Navigate handled by bottom nav
-                        },
-                      ),
-                      _QuickActionCard(
-                        icon: Icons.auto_awesome_rounded,
-                        label: 'Hiệu ứng',
-                        gradient: AppTheme.cyanGradient,
-                        onTap: () {},
-                      ),
-                      _QuickActionCard(
-                        icon: led.autoMode
-                            ? Icons.autorenew_rounded
-                            : Icons.autorenew_outlined,
-                        label: led.autoMode ? 'Tự động: BẬT' : 'Tự động: TẮT',
-                        gradient: led.autoMode
-                            ? const LinearGradient(
-                                colors: [
-                                  AppTheme.accentGreen,
-                                  Color(0xFF00B4D8)
-                                ],
-                              )
-                            : const LinearGradient(
-                                colors: [
-                                  AppTheme.textTertiary,
-                                  AppTheme.textSecondary
-                                ],
-                              ),
-                        onTap: () => led.setAutoMode(!led.autoMode),
-                      ),
-                      _QuickActionCard(
-                        icon: Icons.sensors_rounded,
-                        label:
-                            '${led.sensorData.lightIntensity.toStringAsFixed(0)} lux',
-                        gradient: AppTheme.warmGradient,
-                        onTap: () {},
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Preset colors
-                  Text(
-                    'Màu nhanh',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    height: 64,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      children: [
-                        _PresetColorButton(
-                          color: Colors.red,
-                          label: 'Đỏ',
-                          onTap: () => led.setColor(Colors.red),
-                        ),
-                        _PresetColorButton(
-                          color: Colors.green,
-                          label: 'Xanh lá',
-                          onTap: () => led.setColor(Colors.green),
-                        ),
-                        _PresetColorButton(
-                          color: Colors.blue,
-                          label: 'Xanh dương',
-                          onTap: () => led.setColor(Colors.blue),
-                        ),
-                        _PresetColorButton(
-                          color: Colors.yellow,
-                          label: 'Vàng',
-                          onTap: () => led.setColor(Colors.yellow),
-                        ),
-                        _PresetColorButton(
-                          color: Colors.purple,
-                          label: 'Tím',
-                          onTap: () => led.setColor(Colors.purple),
-                        ),
-                        _PresetColorButton(
-                          color: Colors.orange,
-                          label: 'Cam',
-                          onTap: () => led.setColor(Colors.orange),
-                        ),
-                        _PresetColorButton(
-                          color: Colors.pink,
-                          label: 'Hồng',
-                          onTap: () => led.setColor(Colors.pink),
-                        ),
-                        _PresetColorButton(
-                          color: Colors.cyan,
-                          label: 'Cyan',
-                          onTap: () => led.setColor(Colors.cyan),
-                        ),
-                        _PresetColorButton(
-                          color: const Color(0xFFFFB464),
-                          label: 'Ấm',
-                          onTap: () =>
-                              led.setColor(const Color(0xFFFFB464)),
-                        ),
-                        _PresetColorButton(
-                          color: Colors.white,
-                          label: 'Trắng',
-                          onTap: () => led.setColor(Colors.white),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                      ]),
+                ),
               ),
             ),
           ),
-        ],
-      ),
-    );
-  }
+        ),
+      );
+
+  static void _openTab(BuildContext context, int index) =>
+      context.read<NavigationBloc>().add(NavigationTabSelected(index));
+  static String _colorName(Color color) =>
+      '#${color.toARGB32().toRadixString(16).substring(2).toUpperCase()}';
 }
 
-class _GlassCard extends StatelessWidget {
-  final Widget child;
-  final LinearGradient? gradient;
-
-  const _GlassCard({required this.child, this.gradient});
-
+class _ConnectionBanner extends StatelessWidget {
+  final AppState app;
+  const _ConnectionBanner({required this.app});
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: gradient,
-        color: gradient == null ? AppTheme.cardDark : null,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: AppTheme.borderDark.withOpacity(0.5),
-        ),
-      ),
-      child: child,
+    final connected = app.connectionStatus == MqttConnectionStatus.connected;
+    final busy = app.connectionStatus == MqttConnectionStatus.connecting ||
+        app.connectionStatus == MqttConnectionStatus.reconnecting;
+    return StatusBanner(
+      icon: connected
+          ? Icons.wifi_rounded
+          : busy
+              ? Icons.sync_rounded
+              : Icons.wifi_off_rounded,
+      title: connected
+          ? 'Đã kết nối MQTT'
+          : busy
+              ? 'Đang kết nối'
+              : 'Thiết bị ngoại tuyến',
+      message: connected
+          ? '${app.config.broker}:${app.config.port}'
+          : app.message ?? 'Các điều khiển tạm khóa cho đến khi kết nối lại.',
+      color: connected
+          ? AppTheme.accent
+          : busy
+              ? AppTheme.warning
+              : Theme.of(context).colorScheme.error,
+      action: connected || busy
+          ? null
+          : IconButton(
+              tooltip: 'Kết nối lại',
+              onPressed: () =>
+                  context.read<AppBloc>().add(const AppReconnectRequested()),
+              icon: const Icon(Icons.refresh_rounded),
+            ),
     );
   }
 }
 
-class _QuickActionCard extends StatelessWidget {
+class _PowerCard extends StatelessWidget {
+  final LedBlocState state;
+  final bool enabled;
+  const _PowerCard({required this.state, required this.enabled});
+  @override
+  Widget build(BuildContext context) => SmartCard(
+        borderColor:
+            state.led.isOn ? state.led.color.withValues(alpha: .7) : null,
+        padding: const EdgeInsets.all(20),
+        child: Row(children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              color: state.led.isOn
+                  ? state.led.color.withValues(alpha: .2)
+                  : Theme.of(context).colorScheme.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Icon(
+                state.led.isOn
+                    ? Icons.lightbulb_rounded
+                    : Icons.lightbulb_outline_rounded,
+                color: state.led.isOn ? state.led.color : null,
+                size: 32),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text(state.led.isOn ? 'Đèn đang bật' : 'Đèn đang tắt',
+                    style: Theme.of(context).textTheme.titleLarge),
+                const SizedBox(height: 4),
+                Text(
+                    '${state.led.brightness}% • ${state.led.effect.displayName}',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant)),
+              ])),
+          Semantics(
+            label: 'Bật hoặc tắt đèn',
+            toggled: state.led.isOn,
+            child: Switch(
+              value: state.led.isOn,
+              onChanged: enabled
+                  ? (value) =>
+                      context.read<LedBloc>().add(LedPowerChanged(value))
+                  : null,
+            ),
+          ),
+        ]),
+      );
+}
+
+class _BrightnessCard extends StatelessWidget {
+  final LedBlocState state;
+  final bool enabled;
+  const _BrightnessCard({required this.state, required this.enabled});
+  @override
+  Widget build(BuildContext context) => SmartCard(
+        child: Column(children: [
+          Row(children: [
+            Icon(Icons.brightness_6_rounded,
+                color: Theme.of(context).colorScheme.secondary),
+            const SizedBox(width: 10),
+            Expanded(
+                child: Text('Độ sáng',
+                    style: Theme.of(context).textTheme.titleMedium)),
+            Text('${state.led.brightness}%',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(color: Theme.of(context).colorScheme.secondary)),
+          ]),
+          Slider(
+            value: state.led.brightness.toDouble(),
+            min: 0,
+            max: 100,
+            divisions: 100,
+            label: '${state.led.brightness}%',
+            onChanged: enabled
+                ? (value) => context
+                    .read<LedBloc>()
+                    .add(LedBrightnessPreviewed(value.round()))
+                : null,
+            onChangeEnd: enabled
+                ? (value) => context
+                    .read<LedBloc>()
+                    .add(LedBrightnessCommitted(value.round()))
+                : null,
+          ),
+        ]),
+      );
+}
+
+class _QuickAction extends StatelessWidget {
   final IconData icon;
   final String label;
-  final LinearGradient gradient;
-  final VoidCallback onTap;
-
-  const _QuickActionCard({
-    required this.icon,
-    required this.label,
-    required this.gradient,
-    required this.onTap,
-  });
-
+  final String value;
+  final VoidCallback? onTap;
+  const _QuickAction(
+      {required this.icon,
+      required this.label,
+      required this.value,
+      this.onTap});
   @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: gradient.colors
-                .map((c) => c.withOpacity(0.15))
-                .toList(),
-          ),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: gradient.colors.first.withOpacity(0.3),
-          ),
-        ),
+  Widget build(BuildContext context) => SmartCard(
+        onTap: onTap,
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Icon(
-              icon,
-              color: gradient.colors.first,
-              size: 28,
-            ),
-            Text(
-              label,
-              style: TextStyle(
-                color: gradient.colors.first,
-                fontWeight: FontWeight.w600,
-                fontSize: 13,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon,
+                  color: onTap == null
+                      ? Theme.of(context).disabledColor
+                      : Theme.of(context).colorScheme.secondary),
+              const Spacer(),
+              Text(label, style: Theme.of(context).textTheme.labelLarge),
+              const SizedBox(height: 2),
+              Text(value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant)),
+            ]),
+      );
 }
 
-class _PresetColorButton extends StatelessWidget {
-  final Color color;
+class _PresetColor extends StatelessWidget {
   final String label;
-  final VoidCallback onTap;
-
-  const _PresetColorButton({
-    required this.color,
-    required this.label,
-    required this.onTap,
-  });
-
+  final Color color;
+  const _PresetColor({required this.label, required this.color});
   @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(right: 12),
-        child: Column(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: color,
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: Colors.white.withOpacity(0.3),
-                  width: 2,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: color.withOpacity(0.4),
-                    blurRadius: 8,
-                    spreadRadius: 1,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 10,
-                color: AppTheme.textSecondary,
-              ),
-            ),
-          ],
+  Widget build(BuildContext context) => Semantics(
+        button: true,
+        label: 'Chọn màu $label',
+        child: ActionChip(
+          avatar: CircleAvatar(backgroundColor: color, radius: 10),
+          label: Text(label),
+          onPressed:
+              context.select<AppBloc, bool>((bloc) => bloc.state.isConnected)
+                  ? () => context.read<LedBloc>().add(LedColorApplied(color))
+                  : null,
         ),
-      ),
-    );
-  }
+      );
 }

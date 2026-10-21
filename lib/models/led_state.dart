@@ -1,3 +1,4 @@
+import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
 
 enum LedEffect {
@@ -8,75 +9,56 @@ enum LedEffect {
   breathing,
   strobe,
   colorWipe,
-  chase,
+  chase
 }
 
-extension LedEffectExt on LedEffect {
-  String get displayName {
-    switch (this) {
-      case LedEffect.none:
-        return 'Không hiệu ứng';
-      case LedEffect.blink:
-        return 'Nhấp nháy';
-      case LedEffect.fade:
-        return 'Fade In/Out';
-      case LedEffect.rainbow:
-        return 'Cầu vồng';
-      case LedEffect.breathing:
-        return 'Thở';
-      case LedEffect.strobe:
-        return 'Strobe';
-      case LedEffect.colorWipe:
-        return 'Color Wipe';
-      case LedEffect.chase:
-        return 'Chase';
-    }
-  }
+extension LedEffectX on LedEffect {
+  String get displayName => switch (this) {
+        LedEffect.none => 'Không hiệu ứng',
+        LedEffect.blink => 'Nhấp nháy',
+        LedEffect.fade => 'Mờ dần',
+        LedEffect.rainbow => 'Cầu vồng',
+        LedEffect.breathing => 'Nhịp thở',
+        LedEffect.strobe => 'Chớp nhanh',
+        LedEffect.colorWipe => 'Quét màu',
+        LedEffect.chase => 'Đuổi sáng',
+      };
 
-  String get icon {
-    switch (this) {
-      case LedEffect.none:
-        return '⏹️';
-      case LedEffect.blink:
-        return '💡';
-      case LedEffect.fade:
-        return '🌅';
-      case LedEffect.rainbow:
-        return '🌈';
-      case LedEffect.breathing:
-        return '🫁';
-      case LedEffect.strobe:
-        return '⚡';
-      case LedEffect.colorWipe:
-        return '🎨';
-      case LedEffect.chase:
-        return '🏃';
-    }
-  }
+  String get description => switch (this) {
+        LedEffect.none => 'Giữ một màu ổn định',
+        LedEffect.blink => 'Bật và tắt theo nhịp',
+        LedEffect.fade => 'Chuyển sáng tối mượt mà',
+        LedEffect.rainbow => 'Dải màu chuyển động liên tục',
+        LedEffect.breathing => 'Ánh sáng lên xuống như nhịp thở',
+        LedEffect.strobe => 'Chớp trắng cường độ cao',
+        LedEffect.colorWipe => 'Màu chạy lần lượt qua dải LED',
+        LedEffect.chase => 'Điểm sáng đuổi nhau trên dải LED',
+      };
 
-  String get mqttValue {
-    switch (this) {
-      case LedEffect.none:
-        return 'none';
-      case LedEffect.blink:
-        return 'blink';
-      case LedEffect.fade:
-        return 'fade';
-      case LedEffect.rainbow:
-        return 'rainbow';
-      case LedEffect.breathing:
-        return 'breathing';
-      case LedEffect.strobe:
-        return 'strobe';
-      case LedEffect.colorWipe:
-        return 'color_wipe';
-      case LedEffect.chase:
-        return 'chase';
-    }
-  }
+  IconData get icon => switch (this) {
+        LedEffect.none => Icons.horizontal_rule_rounded,
+        LedEffect.blink => Icons.flash_on_rounded,
+        LedEffect.fade => Icons.gradient_rounded,
+        LedEffect.rainbow => Icons.looks_rounded,
+        LedEffect.breathing => Icons.air_rounded,
+        LedEffect.strobe => Icons.bolt_rounded,
+        LedEffect.colorWipe => Icons.format_color_fill_rounded,
+        LedEffect.chase => Icons.moving_rounded,
+      };
+
+  String get mqttValue => switch (this) {
+        LedEffect.none => 'none',
+        LedEffect.blink => 'blink',
+        LedEffect.fade => 'fade',
+        LedEffect.rainbow => 'rainbow',
+        LedEffect.breathing => 'breathing',
+        LedEffect.strobe => 'strobe',
+        LedEffect.colorWipe => 'color_wipe',
+        LedEffect.chase => 'chase',
+      };
 }
 
-class LedState {
+class LedState extends Equatable {
   final bool isOn;
   final Color color;
   final int brightness;
@@ -93,32 +75,35 @@ class LedState {
     this.numLeds = 30,
   });
 
-  LedState copyWith({
-    bool? isOn,
-    Color? color,
-    int? brightness,
-    LedEffect? effect,
-    int? effectSpeed,
-    int? numLeds,
-  }) {
-    return LedState(
-      isOn: isOn ?? this.isOn,
-      color: color ?? this.color,
-      brightness: brightness ?? this.brightness,
-      effect: effect ?? this.effect,
-      effectSpeed: effectSpeed ?? this.effectSpeed,
-      numLeds: numLeds ?? this.numLeds,
-    );
+  LedState copyWith(
+          {bool? isOn,
+          Color? color,
+          int? brightness,
+          LedEffect? effect,
+          int? effectSpeed,
+          int? numLeds}) =>
+      LedState(
+        isOn: isOn ?? this.isOn,
+        color: color ?? this.color,
+        brightness: brightness ?? this.brightness,
+        effect: effect ?? this.effect,
+        effectSpeed: effectSpeed ?? this.effectSpeed,
+        numLeds: numLeds ?? this.numLeds,
+      );
+
+  Map<String, dynamic> toColorJson() {
+    final argb = color.toARGB32();
+    return {
+      'r': (argb >> 16) & 0xFF,
+      'g': (argb >> 8) & 0xFF,
+      'b': argb & 0xFF
+    };
   }
 
-  Map<String, dynamic> toColorJson() => {
-        'r': color.red,
-        'g': color.green,
-        'b': color.blue,
-      };
+  Map<String, dynamic> toEffectJson() =>
+      {'type': effect.mqttValue, 'speed': effectSpeed};
 
-  Map<String, dynamic> toEffectJson() => {
-        'type': effect.mqttValue,
-        'speed': effectSpeed,
-      };
+  @override
+  List<Object> get props =>
+      [isOn, color, brightness, effect, effectSpeed, numLeds];
 }

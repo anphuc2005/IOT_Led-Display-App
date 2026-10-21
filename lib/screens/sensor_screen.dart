@@ -1,399 +1,268 @@
-import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
-import '../providers/led_provider.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../bloc/app_bloc.dart';
+import '../bloc/led_bloc.dart';
 import '../theme/app_theme.dart';
+import '../widgets/app_widgets.dart';
 
 class SensorScreen extends StatelessWidget {
   const SensorScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final led = context.watch<LedProvider>();
-    final sensor = led.sensorData;
-    final history = led.lightHistory;
-
-    return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Cảm Biến',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Dữ liệu realtime từ ESP32',
-              style: TextStyle(color: AppTheme.textSecondary),
-            ),
-            const SizedBox(height: 24),
-
-            // Sensor cards row
-            Row(
-              children: [
-                Expanded(
-                  child: _SensorInfoCard(
-                    icon: Icons.wb_sunny_rounded,
-                    label: 'Ánh sáng',
-                    value: '${sensor.lightIntensity.toStringAsFixed(0)} lux',
-                    status: sensor.lightLevel,
-                    color: AppTheme.accentOrange,
-                    gradient: AppTheme.warmGradient,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _SensorInfoCard(
-                    icon: Icons.directions_walk_rounded,
-                    label: 'Chuyển động',
-                    value: sensor.motionDetected ? 'Phát hiện' : 'Không',
-                    status: sensor.motionDetected ? 'Có người' : 'Không có',
-                    color: sensor.motionDetected
-                        ? AppTheme.accentGreen
-                        : AppTheme.textSecondary,
-                    gradient: sensor.motionDetected
-                        ? AppTheme.cyanGradient
-                        : const LinearGradient(
-                            colors: [
-                              AppTheme.textTertiary,
-                              AppTheme.textSecondary,
-                            ],
-                          ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-
-            // Auto mode toggle
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: led.autoMode
-                    ? LinearGradient(
-                        colors: [
-                          AppTheme.accentGreen.withOpacity(0.1),
-                          AppTheme.accentCyan.withOpacity(0.1),
-                        ],
-                      )
-                    : null,
-                color: led.autoMode ? null : AppTheme.cardDark,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: led.autoMode
-                      ? AppTheme.accentGreen.withOpacity(0.3)
-                      : AppTheme.borderDark,
-                ),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: led.autoMode
-                          ? AppTheme.accentGreen.withOpacity(0.15)
-                          : AppTheme.surfaceDark,
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Icon(
-                      Icons.auto_mode_rounded,
-                      color: led.autoMode
-                          ? AppTheme.accentGreen
-                          : AppTheme.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Chế độ tự động',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 16,
+  Widget build(BuildContext context) => SafeArea(
+        child: BlocBuilder<LedBloc, LedBlocState>(
+          builder: (context, state) {
+            final connected =
+                context.select<AppBloc, bool>((bloc) => bloc.state.isConnected);
+            final hasData = state.lightHistory.isNotEmpty;
+            final stale = hasData &&
+                DateTime.now().difference(state.sensor.timestamp) >
+                    const Duration(seconds: 10);
+            return SingleChildScrollView(
+              child: ResponsiveContent(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ScreenHeader(
+                        title: 'Cảm biến',
+                        subtitle:
+                            'Theo dõi ánh sáng và chuyển động theo thời gian thực',
+                        trailing: IconButton.filledTonal(
+                          tooltip: state.sensorPaused
+                              ? 'Tiếp tục cập nhật'
+                              : 'Tạm dừng cập nhật',
+                          onPressed: () => context
+                              .read<LedBloc>()
+                              .add(LedSensorPausedChanged(!state.sensorPaused)),
+                          icon: Icon(state.sensorPaused
+                              ? Icons.play_arrow_rounded
+                              : Icons.pause_rounded),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      if (state.sensorPaused || stale)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: StatusBanner(
+                            icon: state.sensorPaused
+                                ? Icons.pause_circle_outline_rounded
+                                : Icons.schedule_rounded,
+                            title: state.sensorPaused
+                                ? 'Đã tạm dừng dữ liệu'
+                                : 'Dữ liệu có thể đã cũ',
+                            message: state.sensorPaused
+                                ? 'Nhấn nút phát để tiếp tục nhận dữ liệu.'
+                                : 'Không có bản cập nhật mới trong hơn 10 giây.',
+                            color: AppTheme.warning,
                           ),
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          led.autoMode
-                              ? 'Tự chỉnh sáng theo ánh sáng & chuyển động'
-                              : 'Bật để tự động điều chỉnh',
-                          style: const TextStyle(
-                            color: AppTheme.textSecondary,
-                            fontSize: 12,
+                      LayoutBuilder(builder: (context, constraints) {
+                        final wide = constraints.maxWidth >= 640;
+                        final cards = [
+                          _MetricCard(
+                            icon: Icons.light_mode_rounded,
+                            label: 'Cường độ sáng',
+                            value:
+                                '${state.sensor.lightIntensity.toStringAsFixed(0)} lux',
+                            description: state.sensor.lightLevel,
+                            color: AppTheme.warning,
                           ),
+                          _MetricCard(
+                            icon: state.sensor.motionDetected
+                                ? Icons.directions_run_rounded
+                                : Icons.person_outline_rounded,
+                            label: 'Chuyển động',
+                            value: state.sensor.motionDetected
+                                ? 'Đã phát hiện'
+                                : 'Không phát hiện',
+                            description: state.sensor.motionDetected
+                                ? 'Có người trong khu vực'
+                                : 'Không gian đang yên tĩnh',
+                            color: state.sensor.motionDetected
+                                ? AppTheme.accent
+                                : Theme.of(context).colorScheme.secondary,
+                          ),
+                        ];
+                        return wide
+                            ? Row(children: [
+                                Expanded(child: cards[0]),
+                                const SizedBox(width: 12),
+                                Expanded(child: cards[1])
+                              ])
+                            : Column(children: [
+                                cards[0],
+                                const SizedBox(height: 12),
+                                cards[1]
+                              ]);
+                      }),
+                      const SizedBox(height: 16),
+                      SmartCard(
+                        child: Row(children: [
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .primary
+                                    .withValues(alpha: .14),
+                                borderRadius: BorderRadius.circular(12)),
+                            child: Icon(Icons.auto_mode_rounded,
+                                color: Theme.of(context).colorScheme.primary),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                              child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                Text('Tự động điều chỉnh',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium),
+                                const SizedBox(height: 2),
+                                Text('Độ sáng LED thay đổi theo mức lux',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall
+                                        ?.copyWith(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurfaceVariant)),
+                              ])),
+                          Switch(
+                            value: state.autoMode,
+                            onChanged: connected
+                                ? (value) => context
+                                    .read<LedBloc>()
+                                    .add(LedAutoModeChanged(value))
+                                : null,
+                          ),
+                        ]),
+                      ),
+                      const SizedBox(height: 24),
+                      const SectionTitle('Lịch sử ánh sáng'),
+                      const SizedBox(height: 12),
+                      SmartCard(
+                        child: hasData
+                            ? SizedBox(
+                                height: 240,
+                                child: _LightChart(
+                                    values: state.lightHistory
+                                        .map((item) => item.lightIntensity)
+                                        .toList()))
+                            : const EmptyPanel(
+                                icon: Icons.show_chart_rounded,
+                                title: 'Chưa có dữ liệu',
+                                message:
+                                    'Biểu đồ sẽ xuất hiện sau khi ESP32 gửi dữ liệu cảm biến.',
+                              ),
+                      ),
+                      if (hasData) ...[
+                        const SizedBox(height: 12),
+                        Text(
+                          'Hiện tại ${state.sensor.lightIntensity.toStringAsFixed(0)} lux, mức ${state.sensor.lightLevel.toLowerCase()}. Biểu đồ lưu tối đa 120 mẫu gần nhất.',
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.copyWith(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant),
                         ),
                       ],
-                    ),
-                  ),
-                  Switch(
-                    value: led.autoMode,
-                    onChanged: (v) => led.setAutoMode(v),
-                    activeColor: AppTheme.accentGreen,
-                  ),
-                ],
+                    ]),
               ),
-            ),
-            const SizedBox(height: 24),
-
-            // Light intensity chart
-            Text(
-              'Biểu đồ cường độ ánh sáng',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              height: 200,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppTheme.cardDark,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.borderDark),
-              ),
-              child: history.isEmpty
-                  ? const Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.show_chart_rounded,
-                            color: AppTheme.textTertiary,
-                            size: 40,
-                          ),
-                          SizedBox(height: 8),
-                          Text(
-                            'Chưa có dữ liệu\nKết nối ESP32 để nhận dữ liệu',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: AppTheme.textTertiary,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                  : LineChart(
-                      LineChartData(
-                        gridData: FlGridData(
-                          show: true,
-                          drawVerticalLine: false,
-                          horizontalInterval: 200,
-                          getDrawingHorizontalLine: (value) => FlLine(
-                            color: AppTheme.borderDark,
-                            strokeWidth: 0.5,
-                          ),
-                        ),
-                        titlesData: FlTitlesData(
-                          topTitles: const AxisTitles(
-                            sideTitles: SideTitles(showTitles: false),
-                          ),
-                          rightTitles: const AxisTitles(
-                            sideTitles: SideTitles(showTitles: false),
-                          ),
-                          bottomTitles: const AxisTitles(
-                            sideTitles: SideTitles(showTitles: false),
-                          ),
-                          leftTitles: AxisTitles(
-                            sideTitles: SideTitles(
-                              showTitles: true,
-                              reservedSize: 40,
-                              getTitlesWidget: (value, meta) {
-                                return Text(
-                                  '${value.toInt()}',
-                                  style: const TextStyle(
-                                    color: AppTheme.textTertiary,
-                                    fontSize: 10,
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ),
-                        borderData: FlBorderData(show: false),
-                        lineBarsData: [
-                          LineChartBarData(
-                            spots: history
-                                .asMap()
-                                .entries
-                                .map((e) => FlSpot(
-                                      e.key.toDouble(),
-                                      e.value.lightIntensity,
-                                    ))
-                                .toList(),
-                            isCurved: true,
-                            gradient: AppTheme.warmGradient,
-                            barWidth: 2,
-                            dotData: const FlDotData(show: false),
-                            belowBarData: BarAreaData(
-                              show: true,
-                              gradient: LinearGradient(
-                                colors: [
-                                  AppTheme.accentOrange.withOpacity(0.2),
-                                  AppTheme.accentOrange.withOpacity(0.0),
-                                ],
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-            ),
-            const SizedBox(height: 24),
-
-            // How it works
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: AppTheme.cardDark,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.borderDark),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Row(
-                    children: [
-                      Icon(Icons.info_outline_rounded, size: 18, color: AppTheme.accentBlue),
-                      SizedBox(width: 8),
-                      Text(
-                        'Cách hoạt động',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.accentBlue,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  _InfoRow(
-                    icon: Icons.wb_sunny_outlined,
-                    text: 'Cảm biến ánh sáng đo cường độ ánh sáng (lux)',
-                  ),
-                  _InfoRow(
-                    icon: Icons.directions_walk_outlined,
-                    text: 'Cảm biến PIR phát hiện chuyển động',
-                  ),
-                  _InfoRow(
-                    icon: Icons.auto_mode_outlined,
-                    text: 'Chế độ tự động: Điều chỉnh sáng theo môi trường',
-                  ),
-                  _InfoRow(
-                    icon: Icons.lightbulb_outline,
-                    text: 'Tự bật đèn khi phát hiện chuyển động (tự động)',
-                  ),
-                ],
-              ),
-            ),
-          ],
+            );
+          },
         ),
-      ),
-    );
-  }
+      );
 }
 
-class _SensorInfoCard extends StatelessWidget {
+class _MetricCard extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
-  final String status;
+  final String description;
   final Color color;
-  final LinearGradient gradient;
-
-  const _SensorInfoCard({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.status,
-    required this.color,
-    required this.gradient,
-  });
-
+  const _MetricCard(
+      {required this.icon,
+      required this.label,
+      required this.value,
+      required this.description,
+      required this.color});
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: gradient.colors
-              .map((c) => c.withOpacity(0.1))
-              .toList(),
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.2)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: 12),
-          Text(
-            label,
-            style: const TextStyle(
-              color: AppTheme.textSecondary,
-              fontSize: 12,
-            ),
+  Widget build(BuildContext context) => SmartCard(
+        child: Row(children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+                color: color.withValues(alpha: .14),
+                borderRadius: BorderRadius.circular(14)),
+            child: Icon(icon, color: color, size: 28),
           ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: TextStyle(
-              color: color,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            status,
-            style: TextStyle(
-              color: color.withOpacity(0.7),
-              fontSize: 11,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+          const SizedBox(width: 14),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text(label,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                const SizedBox(height: 2),
+                Text(value, style: Theme.of(context).textTheme.titleLarge),
+                const SizedBox(height: 2),
+                Text(description, style: Theme.of(context).textTheme.bodySmall),
+              ])),
+        ]),
+      );
 }
 
-class _InfoRow extends StatelessWidget {
-  final IconData icon;
-  final String text;
-
-  const _InfoRow({required this.icon, required this.text});
-
+class _LightChart extends StatelessWidget {
+  final List<double> values;
+  const _LightChart({required this.values});
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 16, color: AppTheme.textSecondary),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(
-                color: AppTheme.textSecondary,
-                fontSize: 13,
-                height: 1.3,
-              ),
-            ),
+    final color = Theme.of(context).colorScheme.secondary;
+    final maxValue =
+        values.fold<double>(100, (max, value) => value > max ? value : max);
+    return Semantics(
+      label:
+          'Biểu đồ ánh sáng gồm ${values.length} mẫu. Giá trị hiện tại ${values.last.toStringAsFixed(0)} lux.',
+      child: LineChart(
+        LineChartData(
+          minY: 0,
+          maxY: maxValue * 1.15,
+          gridData: FlGridData(
+              show: true,
+              drawVerticalLine: false,
+              horizontalInterval: maxValue / 4),
+          borderData: FlBorderData(show: false),
+          titlesData: const FlTitlesData(
+            topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            leftTitles: AxisTitles(
+                sideTitles: SideTitles(showTitles: true, reservedSize: 42)),
           ),
-        ],
+          lineTouchData: const LineTouchData(enabled: true),
+          lineBarsData: [
+            LineChartBarData(
+              spots: [
+                for (var index = 0; index < values.length; index++)
+                  FlSpot(index.toDouble(), values[index])
+              ],
+              isCurved: true,
+              color: color,
+              barWidth: 3,
+              dotData: const FlDotData(show: false),
+              belowBarData:
+                  BarAreaData(show: true, color: color.withValues(alpha: .14)),
+            ),
+          ],
+        ),
+        duration: const Duration(milliseconds: 200),
       ),
     );
   }

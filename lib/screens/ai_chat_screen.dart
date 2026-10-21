@@ -1,338 +1,159 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:uuid/uuid.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../bloc/app_bloc.dart';
+import '../bloc/chat_bloc.dart';
 import '../models/chat_message.dart';
-import '../providers/led_provider.dart';
-import '../services/ai_service.dart';
-import '../theme/app_theme.dart';
+import '../widgets/app_widgets.dart';
+import 'settings_screen.dart';
 
-class AiChatScreen extends StatefulWidget {
+class AiChatScreen extends StatelessWidget {
   const AiChatScreen({super.key});
 
-  @override
-  State<AiChatScreen> createState() => _AiChatScreenState();
-}
-
-class _AiChatScreenState extends State<AiChatScreen> {
-  final TextEditingController _controller = TextEditingController();
-  final ScrollController _scrollController = ScrollController();
-  final List<ChatMessage> _messages = [];
-  bool _isLoading = false;
-  final _uuid = const Uuid();
-
-  @override
-  void initState() {
-    super.initState();
-    // Welcome message
-    _messages.add(ChatMessage(
-      id: _uuid.v4(),
-      content:
-          'Xin chào! Tôi là trợ lý AI điều khiển đèn LED. Bạn có thể nói với tôi những câu như:\n\n'
-          '💡 "Bật đèn màu xanh dương"\n'
-          '🌈 "Cho đèn hiệu ứng cầu vồng"\n'
-          '🔆 "Giảm độ sáng xuống 50%"\n'
-          '⚡ "Nhấp nháy đèn đỏ nhanh"\n'
-          '🤖 "Bật chế độ tự động"\n\n'
-          'Hãy thử đi!',
-      isUser: false,
-      timestamp: DateTime.now(),
-    ));
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    _scrollController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _sendMessage() async {
-    final text = _controller.text.trim();
-    if (text.isEmpty || _isLoading) return;
-
-    _controller.clear();
-
-    setState(() {
-      _messages.add(ChatMessage(
-        id: _uuid.v4(),
-        content: text,
-        isUser: true,
-        timestamp: DateTime.now(),
-      ));
-      _isLoading = true;
-    });
-
-    _scrollToBottom();
-
-    final aiService = context.read<AiService>();
-    final result = await aiService.processCommand(text);
-
-    if (!mounted) return;
-
-    final command = result['command'] as Map<String, dynamic>?;
-
-    setState(() {
-      _messages.add(ChatMessage(
-        id: _uuid.v4(),
-        content: result['response'] as String,
-        isUser: false,
-        timestamp: DateTime.now(),
-        command: command,
-      ));
-      _isLoading = false;
-    });
-
-    // Execute command if present
-    if (command != null) {
-      context.read<LedProvider>().executeCommand(command);
-    }
-
-    _scrollToBottom();
-  }
-
-  void _scrollToBottom() {
-    Future.delayed(const Duration(milliseconds: 100), () {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
-    });
-  }
+  static const _suggestions = [
+    'Bật đèn màu xanh dương',
+    'Giảm độ sáng xuống 30%',
+    'Bật hiệu ứng cầu vồng',
+    'Bật chế độ tự động',
+  ];
 
   @override
   Widget build(BuildContext context) {
-    final aiService = context.watch<AiService>();
-
+    final hasApiKey =
+        context.select<AppBloc, bool>((bloc) => bloc.state.apiKey.isNotEmpty);
     return SafeArea(
-      child: Column(
-        children: [
-          // Header
+      child: Column(children: [
+        ResponsiveContent(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+          child: const ScreenHeader(
+              title: 'Trợ lý AI',
+              subtitle: 'Điều khiển đèn bằng câu lệnh tự nhiên'),
+        ),
+        if (!hasApiKey)
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            child: Row(
-              children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    gradient: AppTheme.primaryGradient,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.smart_toy_rounded,
-                    color: Colors.white,
-                    size: 22,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Trợ Lý AI',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
-                        ),
-                      ),
-                      Text(
-                        aiService.hasApiKey
-                            ? 'Gemini AI • Sẵn sàng'
-                            : 'Chưa cấu hình API Key',
-                        style: TextStyle(
-                          color: aiService.hasApiKey
-                              ? AppTheme.accentGreen
-                              : AppTheme.accentOrange,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: StatusBanner(
+              icon: Icons.key_off_rounded,
+              title: 'Chưa có Gemini API Key',
+              message: 'Thêm API key trong Cài đặt để bắt đầu trò chuyện.',
+              color: Theme.of(context).colorScheme.error,
+              action: TextButton(
+                onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const SettingsScreen())),
+                child: const Text('Cài đặt'),
+              ),
             ),
           ),
-          const Divider(color: AppTheme.borderDark, height: 1),
-
-          // Messages
-          Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.all(16),
-              itemCount: _messages.length + (_isLoading ? 1 : 0),
+        Expanded(
+          child: BlocBuilder<ChatBloc, ChatState>(
+            builder: (context, state) => ListView.builder(
+              reverse: true,
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+              itemCount: state.messages.length + (state.isSending ? 1 : 0),
               itemBuilder: (context, index) {
-                if (index == _messages.length) {
-                  return _buildLoadingBubble();
+                if (state.isSending && index == 0) {
+                  return const _TypingBubble();
                 }
-                return _ChatBubble(message: _messages[index]);
+                final offset = state.isSending ? 1 : 0;
+                final messageIndex =
+                    state.messages.length - 1 - (index - offset);
+                return _MessageBubble(message: state.messages[messageIndex]);
               },
             ),
           ),
-
-          // Quick actions
-          SizedBox(
-            height: 40,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              children: [
-                _QuickChip(
-                  label: '💡 Bật đèn trắng',
-                  onTap: () {
-                    _controller.text = 'Bật đèn màu trắng';
-                    _sendMessage();
-                  },
-                ),
-                _QuickChip(
-                  label: '🌈 Hiệu ứng cầu vồng',
-                  onTap: () {
-                    _controller.text = 'Cho đèn hiệu ứng cầu vồng';
-                    _sendMessage();
-                  },
-                ),
-                _QuickChip(
-                  label: '🔴 Đèn đỏ nhấp nháy',
-                  onTap: () {
-                    _controller.text = 'Cho đèn đỏ nhấp nháy';
-                    _sendMessage();
-                  },
-                ),
-                _QuickChip(
-                  label: '🌙 Đèn ngủ',
-                  onTap: () {
-                    _controller.text = 'Bật đèn ấm, giảm sáng 20%';
-                    _sendMessage();
-                  },
-                ),
-                _QuickChip(
-                  label: '⏹️ Tắt đèn',
-                  onTap: () {
-                    _controller.text = 'Tắt đèn';
-                    _sendMessage();
-                  },
-                ),
-              ],
+        ),
+        SizedBox(
+          height: 44,
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            scrollDirection: Axis.horizontal,
+            itemCount: _suggestions.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (context, index) => ActionChip(
+              label: Text(_suggestions[index]),
+              onPressed: hasApiKey
+                  ? () => context
+                      .read<ChatBloc>()
+                      .add(ChatMessageSubmitted(_suggestions[index]))
+                  : null,
             ),
           ),
-          const SizedBox(height: 8),
-
-          // Input
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppTheme.surfaceDark,
-              border: Border(
-                top: BorderSide(color: AppTheme.borderDark.withOpacity(0.5)),
-              ),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _controller,
-                    decoration: InputDecoration(
-                      hintText: 'Nhập lệnh điều khiển đèn...',
-                      filled: true,
-                      fillColor: AppTheme.cardDark,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24),
-                        borderSide: BorderSide.none,
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 12,
-                      ),
-                    ),
-                    onSubmitted: (_) => _sendMessage(),
-                    textInputAction: TextInputAction.send,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    gradient: AppTheme.primaryGradient,
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  child: IconButton(
-                    onPressed: _isLoading ? null : _sendMessage,
-                    icon: Icon(
-                      _isLoading ? Icons.hourglass_top : Icons.send_rounded,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLoadingBubble() {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.only(top: 8, right: 60),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppTheme.cardDark,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppTheme.borderDark),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: AppTheme.accentBlue.withOpacity(0.6),
-              ),
-            ),
-            const SizedBox(width: 12),
-            const Text(
-              'Đang suy nghĩ...',
-              style: TextStyle(
-                color: AppTheme.textSecondary,
-                fontSize: 14,
-              ),
-            ),
-          ],
-        ),
-      ),
+        const SizedBox(height: 8),
+        _Composer(enabled: hasApiKey),
+      ]),
     );
   }
 }
 
-class _ChatBubble extends StatelessWidget {
+class _Composer extends StatelessWidget {
+  final bool enabled;
+  const _Composer({required this.enabled});
+  @override
+  Widget build(BuildContext context) => BlocBuilder<ChatBloc, ChatState>(
+        builder: (context, state) => Material(
+          color: Theme.of(context).colorScheme.surface,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+              Expanded(
+                child: TextFormField(
+                  key: ValueKey(state.inputRevision),
+                  initialValue: state.draft,
+                  enabled: enabled && !state.isSending,
+                  minLines: 1,
+                  maxLines: 4,
+                  textInputAction: TextInputAction.send,
+                  onChanged: (value) =>
+                      context.read<ChatBloc>().add(ChatDraftChanged(value)),
+                  onFieldSubmitted: (_) => context
+                      .read<ChatBloc>()
+                      .add(const ChatMessageSubmitted()),
+                  decoration: InputDecoration(
+                    hintText:
+                        enabled ? 'Nhập lệnh cho đèn…' : 'Cần cấu hình API key',
+                    prefixIcon: const Icon(Icons.auto_awesome_rounded),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton.filled(
+                tooltip: 'Gửi tin nhắn',
+                onPressed:
+                    enabled && !state.isSending && state.draft.trim().isNotEmpty
+                        ? () => context
+                            .read<ChatBloc>()
+                            .add(const ChatMessageSubmitted())
+                        : null,
+                icon: state.isSending
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.send_rounded),
+              ),
+            ]),
+          ),
+        ),
+      );
+}
+
+class _MessageBubble extends StatelessWidget {
   final ChatMessage message;
-
-  const _ChatBubble({required this.message});
-
+  const _MessageBubble({required this.message});
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Align(
-      alignment:
-          message.isUser ? Alignment.centerRight : Alignment.centerLeft,
+      alignment: message.isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
+        constraints: const BoxConstraints(maxWidth: 520),
         margin: EdgeInsets.only(
-          top: 8,
-          left: message.isUser ? 60 : 0,
-          right: message.isUser ? 0 : 60,
-        ),
+            bottom: 12,
+            left: message.isUser ? 48 : 0,
+            right: message.isUser ? 0 : 48),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          gradient: message.isUser ? AppTheme.primaryGradient : null,
-          color: message.isUser ? null : AppTheme.cardDark,
+          color: message.isUser ? scheme.primary : scheme.surfaceContainer,
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(16),
             topRight: const Radius.circular(16),
@@ -341,87 +162,46 @@ class _ChatBubble extends StatelessWidget {
           ),
           border: message.isUser
               ? null
-              : Border.all(color: AppTheme.borderDark),
+              : Border.all(color: scheme.outline.withValues(alpha: .6)),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              message.content,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(message.content,
               style: TextStyle(
-                color: message.isUser ? Colors.white : AppTheme.textPrimary,
-                fontSize: 14,
-                height: 1.4,
-              ),
-            ),
-            if (message.command != null) ...[
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: AppTheme.accentGreen.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: AppTheme.accentGreen.withOpacity(0.3),
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.check_circle_outline,
-                      color: AppTheme.accentGreen,
-                      size: 14,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Đã thực thi lệnh',
-                      style: TextStyle(
-                        color: AppTheme.accentGreen,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+                  color: message.isUser ? scheme.onPrimary : scheme.onSurface,
+                  height: 1.45)),
+          if (message.command != null) ...[
+            const SizedBox(height: 8),
+            Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(Icons.check_circle_rounded,
+                  size: 16,
+                  color: message.isUser ? scheme.onPrimary : scheme.primary),
+              const SizedBox(width: 6),
+              Text('Đã nhận lệnh điều khiển',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color:
+                          message.isUser ? scheme.onPrimary : scheme.primary)),
+            ]),
           ],
-        ),
+        ]),
       ),
     );
   }
 }
 
-class _QuickChip extends StatelessWidget {
-  final String label;
-  final VoidCallback onTap;
-
-  const _QuickChip({required this.label, required this.onTap});
-
+class _TypingBubble extends StatelessWidget {
+  const _TypingBubble();
   @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(right: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: AppTheme.cardDark,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppTheme.borderDark),
-        ),
-        child: Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            color: AppTheme.textSecondary,
+  Widget build(BuildContext context) => const Align(
+        alignment: Alignment.centerLeft,
+        child: Padding(
+          padding: EdgeInsets.only(bottom: 12),
+          child: Chip(
+            avatar: SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2)),
+            label: Text('Đang xử lý…'),
           ),
         ),
-      ),
-    );
-  }
+      );
 }
