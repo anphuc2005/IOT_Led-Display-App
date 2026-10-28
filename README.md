@@ -12,8 +12,9 @@ tích hợp trợ lý AI (Google Gemini) để điều khiển bằng ngôn ng�
 | Linh kiện | Kết nối ESP32 |
 |---|---|
 | ESP32 DevKit | - |
-| WS2812 LED Strip | Data → GPIO 5, VCC → 5V, GND → GND |
-| Cảm biến ánh sáng (LDR/BH1750) | Analog → GPIO 34 |
+| WS2812 LED Strip | Data → GPIO 18 (8 LED), VCC → 5V, GND → GND |
+| BH1750 | SDA → GPIO 21, SCL → GPIO 22 |
+| DHT11 | Data → GPIO 26 |
 | Cảm biến chuyển động PIR | Signal → GPIO 27, VCC → 3.3V |
 
 ## Cài đặt
@@ -21,8 +22,8 @@ tích hợp trợ lý AI (Google Gemini) để điều khiển bằng ngôn ng�
 ### 1. Nạp firmware ESP32
 
 1. Mở Arduino IDE
-2. Cài thư viện: `Adafruit NeoPixel`, `PubSubClient`, `ArduinoJson`
-3. Mở file `esp32_firmware/smart_led_esp32.ino`
+2. Cài thư viện: `Adafruit NeoPixel`, `PubSubClient`, `ArduinoJson` (7.x), `BH1750`, `DHT sensor library`, `Adafruit Unified Sensor`
+3. Mở file `esp32_firmware/smart_led_esp32/smart_led_esp32.ino`
 4. Đổi `WIFI_SSID` và `WIFI_PASSWORD` thành WiFi của bạn
 5. Nạp code vào ESP32
 
@@ -105,3 +106,19 @@ App IOT/
 │   └── smart_led_esp32.ino    # ESP32 Arduino code
 └── pubspec.yaml
 ```
+
+## Cấu hình firmware theo sketch_oct20a
+
+Firmware mặc định chạy tự động; có thể tắt qua `smart_led/auto_mode` để điều khiển thủ công.
+PIR khởi động 45 giây, giữ đèn 60 giây sau chuyển động cuối; bật khi dưới 30 lux,
+ngưỡng sáng 45 lux, chuyển sáng mượt 1,5 giây. Nhiệt độ 20–35°C đổi màu trắng sang vàng ấm.
+Giới hạn độ sáng mỗi kênh là 80/255, kể cả điều khiển thủ công. BH1750 lỗi sẽ thử lại mỗi 5 giây
+và cho phép PIR bật ánh sáng dự phòng. DHT11 lỗi dùng màu ấm dự phòng.
+WiFi/MQTT giữ cấu hình trong firmware; broker trong ứng dụng phải trùng firmware.
+Topic bổ sung `smart_led/sensor/climate` gửi `valid`, `temperature`, `humidity`;
+ứng dụng hiện tại chưa hiển thị nhiệt độ/độ ẩm. Các topic điều khiển cũ được giữ nguyên.
+Khi bật tự động, ESP32 quyết định trạng thái LED theo cảm biến; lệnh màu/độ sáng
+được lưu cho lần chuyển về thủ công. Lệnh bật/tắt nguồn luôn chuyển ngay sang thủ công,
+ưu tiên hơn cảm biến và hiệu ứng. Chỉ khi bật lại chế độ tự động thì cảm biến mới điều khiển đèn.
+Ứng dụng chỉ hiển thị dữ liệu cảm biến, không tự gửi lệnh nguồn/độ sáng theo cảm biến. Mất mạng không dừng việc đọc cảm biến và điều khiển tự động,
+nhưng mỗi lần thử kết nối MQTT có thể gây một khoảng chờ ngắn.
