@@ -28,7 +28,7 @@ class SmartLedApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => MqttService()),
-        Provider(create: (_) => AiService()),
+        ChangeNotifierProvider(create: (_) => AiService()),
         Provider(create: (_) => StorageService()),
         ChangeNotifierProxyProvider<MqttService, LedProvider>(
           create: (context) => LedProvider(context.read<MqttService>()),

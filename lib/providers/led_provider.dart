@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../models/led_state.dart';
 import '../models/sensor_data.dart';
-import '../models/mqtt_config.dart';
 import '../services/mqtt_service.dart';
 
 class LedProvider extends ChangeNotifier {
@@ -142,7 +141,68 @@ class LedProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Execute command from AI assistant
+  /// Build current device & sensor context for AI prompt
+  String buildStateContextSummary() {
+    final c = _ledState.color;
+    final r = (c.r * 255.0).round().clamp(0, 255);
+    final g = (c.g * 255.0).round().clamp(0, 255);
+    final b = (c.b * 255.0).round().clamp(0, 255);
+    return 'Trạng thái đèn hiện tại: '
+        'nguồn=${_ledState.isOn ? "BẬT" : "TẮT"}, '
+        'màu=RGB($r, $g, $b), '
+        'độ sáng=${_ledState.brightness}%, '
+        'hiệu ứng=${_ledState.effect.mqttValue} (${_ledState.effect.displayName}, tốc độ ${_ledState.effectSpeed}ms), '
+        'số bóng LED=${_ledState.numLeds}, '
+        'chế độ tự động=${_autoMode ? "BẬT" : "TẮT"}, '
+        'cảm biến ánh sáng=${_sensorData.lightIntensity.toStringAsFixed(1)} lux, '
+        'chuyển động PIR=${_sensorData.motionDetected ? "CÓ NGƯỜI" : "KHÔNG"}.';
+  }
+
+  /// Execute multiple commands from AI assistant in optimal MQTT order
+  void executeCommands(List<Map<String, dynamic>> commands) {
+    if (commands.isEmpty) return;
+
+    final hasAutoModeTrue = commands.any(
+      (c) => c['action'] == 'auto_mode' && c['enabled'] == true,
+    );
+    final hasManualControl = commands.any(
+      (c) =>
+          c['action'] == 'power' ||
+          c['action'] == 'color' ||
+          c['action'] == 'brightness' ||
+          c['action'] == 'effect',
+    );
+    final hasPowerCmd = commands.any((c) => c['action'] == 'power');
+    final hasColorCmd = commands.any((c) => c['action'] == 'color');
+    final hasEffectCmd = commands.any((c) => c['action'] == 'effect');
+
+    if (hasManualControl && !hasAutoModeTrue && _autoMode) {
+      setAutoMode(false);
+    }
+
+    // Ensure power is ON first on ESP32 before applying color/brightness/effect
+    if (!hasPowerCmd &&
+        (hasColorCmd ||
+            hasEffectCmd ||
+            commands.any((c) => c['action'] == 'brightness')) &&
+        !_ledState.isOn) {
+      togglePower(true);
+    }
+
+    // If user asks for a specific color without specifying an effect, clear rainbow/strobe
+    if (hasColorCmd &&
+        !hasEffectCmd &&
+        (_ledState.effect == LedEffect.rainbow ||
+            _ledState.effect == LedEffect.strobe)) {
+      setEffect(LedEffect.none);
+    }
+
+    for (final cmd in commands) {
+      executeCommand(cmd);
+    }
+  }
+
+  /// Execute single command from AI assistant
   void executeCommand(Map<String, dynamic> command) {
     final action = command['action'] as String?;
     switch (action) {
@@ -150,31 +210,43 @@ class LedProvider extends ChangeNotifier {
         togglePower(command['state'] == 'on');
         break;
       case 'color':
+        if (!_ledState.isOn) togglePower(true);
         setColor(Color.fromARGB(
           255,
-          (command['r'] as num).toInt(),
-          (command['g'] as num).toInt(),
-          (command['b'] as num).toInt(),
+          ((command['r'] as num?)?.toInt() ?? 255).clamp(0, 255),
+          ((command['g'] as num?)?.toInt() ?? 255).clamp(0, 255),
+          ((command['b'] as num?)?.toInt() ?? 255).clamp(0, 255),
         ));
-        if (!_ledState.isOn) togglePower(true);
         break;
       case 'brightness':
-        setBrightness((command['value'] as num).toInt());
+        setBrightness(((command['value'] as num?)?.toInt() ?? 100).clamp(0, 100));
         break;
       case 'effect':
+        if (!_ledState.isOn) togglePower(true);
         final type = command['type'] as String?;
         final effect = LedEffect.values.firstWhere(
           (e) => e.mqttValue == type,
           orElse: () => LedEffect.none,
         );
-        setEffect(effect);
         if (command['speed'] != null) {
-          setEffectSpeed((command['speed'] as num).toInt());
+          _ledState = _ledState.copyWith(
+            effect: effect,
+            effectSpeed: ((command['speed'] as num).toInt()).clamp(50, 3000),
+          );
+          _mqttService.publish(
+            _mqttService.config.effectTopic,
+            _ledState.toEffectJson(),
+          );
+          notifyListeners();
+        } else {
+          setEffect(effect);
         }
-        if (!_ledState.isOn) togglePower(true);
         break;
       case 'auto_mode':
         setAutoMode(command['enabled'] as bool? ?? false);
+        break;
+      case 'num_leds':
+        setNumLeds(((command['count'] as num?)?.toInt() ?? 8).clamp(1, 300));
         break;
     }
   }

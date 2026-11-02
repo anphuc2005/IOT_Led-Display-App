@@ -7,6 +7,11 @@ class StorageService {
   static const String _geminiApiKey = 'gemini_api_key';
   static const String _autoModeKey = 'auto_mode';
   static const String _numLedsKey = 'num_leds';
+  static const String _voiceEnabledKey = 'ai_voice_enabled';
+
+  /// Compile-time or default environment API Key
+  static const String defaultGeminiApiKey =
+      String.fromEnvironment('GEMINI_API_KEY', defaultValue: '');
 
   Future<void> saveMqttConfig(MqttConfig config) async {
     final prefs = await SharedPreferences.getInstance();
@@ -29,7 +34,11 @@ class StorageService {
 
   Future<String> loadGeminiApiKey() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_geminiApiKey) ?? '';
+    final saved = prefs.getString(_geminiApiKey);
+    if (saved != null && saved.trim().isNotEmpty) {
+      return saved.trim();
+    }
+    return defaultGeminiApiKey;
   }
 
   Future<void> saveAutoMode(bool enabled) async {
@@ -50,5 +59,15 @@ class StorageService {
   Future<int> loadNumLeds() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getInt(_numLedsKey) ?? 30;
+  }
+
+  Future<void> saveVoiceEnabled(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_voiceEnabledKey, enabled);
+  }
+
+  Future<bool> loadVoiceEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_voiceEnabledKey) ?? true;
   }
 }
