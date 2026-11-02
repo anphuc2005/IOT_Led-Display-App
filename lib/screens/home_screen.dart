@@ -455,6 +455,120 @@ class _DashboardView extends StatelessWidget {
                             onChanged: (v) => led.setBrightness(v.toInt()),
                           ),
                         ),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [25, 50, 75, 100].map((b) {
+                            final isSel = state.brightness == b;
+                            return GestureDetector(
+                              onTap: () => led.setBrightness(b),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: isSel
+                                      ? AppTheme.accentCyan.withValues(alpha: 0.25)
+                                      : Colors.white.withValues(alpha: 0.06),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: isSel
+                                        ? AppTheme.accentCyan
+                                        : Colors.white.withValues(alpha: 0.12),
+                                    width: isSel ? 1.5 : 1,
+                                  ),
+                                ),
+                                child: Text(
+                                  '$b%',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
+                                    color: isSel ? AppTheme.accentCyan : AppTheme.textSecondary,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+
+                  // Smart Scenes Header
+                  const Text(
+                    'Ngữ Cảnh Chiếu Sáng',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Scene Modes Horizontal Carousel
+                  SizedBox(
+                    height: 104,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      children: [
+                        _SceneCard(
+                          icon: Icons.menu_book_rounded,
+                          label: 'Học bài & Làm việc',
+                          subtitle: 'Trắng 80%',
+                          color: const Color(0xFFE2E8F0),
+                          onTap: () {
+                            if (!state.isOn) led.togglePower(true);
+                            led.setColor(const Color(0xFFFFFFFF));
+                            led.setBrightness(80);
+                            led.setEffect(LedEffect.none);
+                          },
+                        ),
+                        _SceneCard(
+                          icon: Icons.coffee_rounded,
+                          label: 'Thư giãn & Chill',
+                          subtitle: 'Vàng ấm 45%',
+                          color: const Color(0xFFFFB703),
+                          onTap: () {
+                            if (!state.isOn) led.togglePower(true);
+                            led.setColor(const Color(0xFFFFB464));
+                            led.setBrightness(45);
+                            led.setEffect(LedEffect.none);
+                          },
+                        ),
+                        _SceneCard(
+                          icon: Icons.movie_rounded,
+                          label: 'Rạp phim tại gia',
+                          subtitle: 'Tím dịu 25%',
+                          color: const Color(0xFFA855F7),
+                          onTap: () {
+                            if (!state.isOn) led.togglePower(true);
+                            led.setColor(const Color(0xFF8A2BE2));
+                            led.setBrightness(25);
+                            led.setEffect(LedEffect.none);
+                          },
+                        ),
+                        _SceneCard(
+                          icon: Icons.nightlight_round,
+                          label: 'Đèn ngủ êm dịu',
+                          subtitle: 'Hổ phách 10%',
+                          color: const Color(0xFFFF8500),
+                          onTap: () {
+                            if (!state.isOn) led.togglePower(true);
+                            led.setColor(const Color(0xFFFF8500));
+                            led.setBrightness(10);
+                            led.setEffect(LedEffect.none);
+                          },
+                        ),
+                        _SceneCard(
+                          icon: Icons.celebration_rounded,
+                          label: 'Sôi động Party',
+                          subtitle: 'Cầu vồng 100%',
+                          color: const Color(0xFF00F2FE),
+                          onTap: () {
+                            if (!state.isOn) led.togglePower(true);
+                            led.setBrightness(100);
+                            led.setEffect(LedEffect.rainbow);
+                          },
+                        ),
                       ],
                     ),
                   ),
@@ -702,6 +816,88 @@ class _GemstoneColor3D extends StatelessWidget {
                 fontWeight: FontWeight.w600,
                 color: AppTheme.textSecondary,
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 3D Liquid Glass Smart Scene Card
+class _SceneCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String subtitle;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _SceneCard({
+    required this.icon,
+    required this.label,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 154,
+      margin: const EdgeInsets.only(right: 12),
+      child: LiquidGlassCard(
+        borderRadius: 18,
+        padding: const EdgeInsets.all(12),
+        tintColor: color,
+        onTap: onTap,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: color.withValues(alpha: 0.22),
+                    border: Border.all(
+                      color: color.withValues(alpha: 0.4),
+                      width: 1,
+                    ),
+                  ),
+                  child: Icon(icon, color: color, size: 16),
+                ),
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 11,
+                  color: Colors.white.withValues(alpha: 0.35),
+                ),
+              ],
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    color: color.withValues(alpha: 0.95),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ),
           ],
         ),

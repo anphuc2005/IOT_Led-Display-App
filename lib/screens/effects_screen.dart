@@ -191,6 +191,39 @@ class EffectsScreen extends StatelessWidget {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [100, 300, 500, 1000].map((ms) {
+                      final isSel = (state.effectSpeed - ms).abs() < 50;
+                      return GestureDetector(
+                        onTap: () => led.setEffectSpeed(ms),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: isSel
+                                ? AppTheme.accentPurple.withValues(alpha: 0.25)
+                                : Colors.white.withValues(alpha: 0.06),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isSel
+                                  ? AppTheme.accentPurple
+                                  : Colors.white.withValues(alpha: 0.12),
+                              width: isSel ? 1.5 : 1,
+                            ),
+                          ),
+                          child: Text(
+                            '${ms}ms',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
+                              color: isSel ? AppTheme.accentPurple : AppTheme.textSecondary,
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
                 ],
               ),
             ),

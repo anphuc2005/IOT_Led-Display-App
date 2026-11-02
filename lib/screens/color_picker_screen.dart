@@ -1,4 +1,6 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:provider/provider.dart';
 import '../providers/led_provider.dart';
@@ -15,6 +17,53 @@ class ColorPickerScreen extends StatefulWidget {
 class _ColorPickerScreenState extends State<ColorPickerScreen> {
   late Color _currentColor;
   bool _initialized = false;
+  double _kelvin = 4000;
+
+  int get _r => (_currentColor.r * 255.0).round().clamp(0, 255);
+  int get _g => (_currentColor.g * 255.0).round().clamp(0, 255);
+  int get _b => (_currentColor.b * 255.0).round().clamp(0, 255);
+
+  String get _hexCode {
+    return '#${_r.toRadixString(16).padLeft(2, '0').toUpperCase()}'
+        '${_g.toRadixString(16).padLeft(2, '0').toUpperCase()}'
+        '${_b.toRadixString(16).padLeft(2, '0').toUpperCase()}';
+  }
+
+  // Convert Kelvin (2000 - 8000K) to natural white light RGB
+  Color _kelvinToRgb(double kelvin) {
+    final temp = kelvin / 100.0;
+    double red, green, blue;
+
+    if (temp <= 66) {
+      red = 255;
+    } else {
+      red = temp - 60;
+      red = 329.698727446 * (pow(red, -0.1332047592));
+      red = red.clamp(0, 255);
+    }
+
+    if (temp <= 66) {
+      green = temp;
+      green = 99.4708025861 * log(green) - 161.1195681661;
+      green = green.clamp(0, 255);
+    } else {
+      green = temp - 60;
+      green = 288.1221695283 * (pow(green, -0.0755148492));
+      green = green.clamp(0, 255);
+    }
+
+    if (temp >= 66) {
+      blue = 255;
+    } else if (temp <= 19) {
+      blue = 0;
+    } else {
+      blue = temp - 10;
+      blue = 138.5177312231 * log(blue) - 305.0447927307;
+      blue = blue.clamp(0, 255);
+    }
+
+    return Color.fromARGB(255, red.round(), green.round(), blue.round());
+  }
 
   @override
   void didChangeDependencies() {
@@ -96,17 +145,64 @@ class _ColorPickerScreenState extends State<ColorPickerScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Màu đang chọn',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: AppTheme.textSecondary,
-                          ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Màu đang chọn',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.textSecondary,
+                              ),
+                            ),
+                            GestureDetector(
+                              onTap: () {
+                                Clipboard.setData(ClipboardData(text: _hexCode));
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('📋 Đã sao chép mã màu: $_hexCode'),
+                                    backgroundColor: AppTheme.accentCyan,
+                                    behavior: SnackBarBehavior.floating,
+                                    duration: const Duration(seconds: 2),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                );
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.2),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      _hexCode,
+                                      style: const TextStyle(
+                                        fontFamily: 'monospace',
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppTheme.accentCyan,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    const Icon(Icons.copy_rounded, size: 12, color: AppTheme.accentCyan),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 3),
+                        const SizedBox(height: 4),
                         Text(
-                          'R: ${_currentColor.red}   G: ${_currentColor.green}   B: ${_currentColor.blue}',
+                          'R: $_r   G: $_g   B: $_b',
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
@@ -140,6 +236,77 @@ class _ColorPickerScreenState extends State<ColorPickerScreen> {
             ),
             const SizedBox(height: 16),
 
+            // Kelvin Color Temperature Card (2200K - 6500K)
+            LiquidGlassCard(
+              borderRadius: 24,
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.wb_incandescent_rounded,
+                              size: 18, color: AppTheme.accentOrange),
+                          SizedBox(width: 8),
+                          Text(
+                            'Nhiệt Độ Màu Tự Nhiên (Kelvin)',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        '${_kelvin.round()}K',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.accentOrange,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  SliderTheme(
+                    data: SliderThemeData(
+                      activeTrackColor: const Color(0xFFFFB464),
+                      inactiveTrackColor: Colors.white.withValues(alpha: 0.12),
+                      thumbColor: Colors.white,
+                      overlayColor: const Color(0xFFFFB464).withValues(alpha: 0.2),
+                      trackHeight: 6,
+                    ),
+                    child: Slider(
+                      value: _kelvin,
+                      min: 2200,
+                      max: 6500,
+                      onChanged: (v) {
+                        setState(() {
+                          _kelvin = v;
+                          _currentColor = _kelvinToRgb(v);
+                        });
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _buildKelvinChip('🕯️ 2200K', 2200),
+                      _buildKelvinChip('🌅 2700K', 2700),
+                      _buildKelvinChip('☀️ 4000K', 4000),
+                      _buildKelvinChip('💡 6500K', 6500),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
             // RGB Fine-tuning Sliders in 3D Liquid Glass
             LiquidGlassCard(
               borderRadius: 24,
@@ -148,33 +315,33 @@ class _ColorPickerScreenState extends State<ColorPickerScreen> {
                 children: [
                   _ColorSlider(
                     label: 'R',
-                    value: _currentColor.red.toDouble(),
+                    value: _r.toDouble(),
                     activeColor: const Color(0xFFFF2D55),
                     onChanged: (v) {
                       setState(() {
-                        _currentColor = _currentColor.withRed(v.toInt());
+                        _currentColor = Color.fromARGB(255, v.toInt(), _g, _b);
                       });
                     },
                   ),
                   const SizedBox(height: 10),
                   _ColorSlider(
                     label: 'G',
-                    value: _currentColor.green.toDouble(),
+                    value: _g.toDouble(),
                     activeColor: const Color(0xFF00F5D4),
                     onChanged: (v) {
                       setState(() {
-                        _currentColor = _currentColor.withGreen(v.toInt());
+                        _currentColor = Color.fromARGB(255, _r, v.toInt(), _b);
                       });
                     },
                   ),
                   const SizedBox(height: 10),
                   _ColorSlider(
                     label: 'B',
-                    value: _currentColor.blue.toDouble(),
+                    value: _b.toDouble(),
                     activeColor: const Color(0xFF38BDF8),
                     onChanged: (v) {
                       setState(() {
-                        _currentColor = _currentColor.withBlue(v.toInt());
+                        _currentColor = Color.fromARGB(255, _r, _g, v.toInt());
                       });
                     },
                   ),
@@ -233,6 +400,41 @@ class _ColorPickerScreenState extends State<ColorPickerScreen> {
             const SizedBox(height: 12),
             _buildPresetGrid(),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildKelvinChip(String label, double kelvinVal) {
+    final isSelected = (_kelvin - kelvinVal).abs() < 100;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _kelvin = kelvinVal;
+          _currentColor = _kelvinToRgb(kelvinVal);
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? const Color(0xFFFFB464).withValues(alpha: 0.25)
+              : Colors.white.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected
+                ? const Color(0xFFFFB464)
+                : Colors.white.withValues(alpha: 0.14),
+            width: isSelected ? 1.5 : 1,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+            color: isSelected ? const Color(0xFFFFB464) : AppTheme.textSecondary,
+          ),
         ),
       ),
     );

@@ -806,6 +806,8 @@ class _AiChatScreenState extends State<AiChatScreen>
     final aiService = context.watch<AiService>();
     final ledProvider = context.watch<LedProvider>();
     final ledState = ledProvider.ledState;
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final bottomPad = bottomInset > 0 ? 8.0 : 86.0;
 
     return SafeArea(
       child: Column(
@@ -1152,7 +1154,7 @@ class _AiChatScreenState extends State<AiChatScreen>
 
           // 3D Liquid Glass Floating Input Capsule
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+            padding: EdgeInsets.fromLTRB(16, 4, 16, bottomPad),
             child: LiquidGlassCard(
               borderRadius: 30,
               padding: const EdgeInsets.all(6),
