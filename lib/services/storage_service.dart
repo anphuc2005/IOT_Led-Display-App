@@ -45,6 +45,9 @@ class StorageService {
     if (saved != null && saved.trim().isNotEmpty) {
       return saved.trim();
     }
+    if (defaultGeminiApiKey.isNotEmpty) {
+      await prefs.setString(_geminiApiKey, defaultGeminiApiKey);
+    }
     return defaultGeminiApiKey;
   }
 

@@ -28,9 +28,14 @@ class AiService extends ChangeNotifier {
   /// Multi-model pool: Automatically rotates to the next model when quota/rate-limit (429) or overload (503) occurs
   static const List<GeminiModelInfo> modelPool = [
     GeminiModelInfo(
+      id: 'gemini-2.5-flash',
+      name: 'Gemini 2.5 Flash (Tức thì - 0s Thinking)',
+      description: 'Phản hồi cực nhanh <1s, tắt hoàn toàn thinking delay',
+    ),
+    GeminiModelInfo(
       id: 'gemini-3.5-flash-lite',
       name: 'Gemini 3.5 Flash-Lite',
-      description: 'Tốc độ phản hồi giọng nói nhanh nhất',
+      description: 'Model thế hệ mới, nhẹ và tiết kiệm quota',
     ),
     GeminiModelInfo(
       id: 'gemini-3.1-flash-lite',
@@ -329,14 +334,29 @@ BẢNG MÀU THAM CHIẾU CHUẨN:
       final modelId = modelInfo.id;
 
       try {
-        final prevId =
-            (_lastInteractionModel == modelId) ? _previousInteractionId : null;
+        Map<String, dynamic>? result;
 
-        final result = await _callInteractionsApi(
-          model: modelId,
-          input: enrichedInput,
-          previousInteractionId: prevId,
-        );
+        // 1. If gemini-2.5-flash, execute ultra-fast direct generateContent with 0s thinking delay
+        if (modelId == 'gemini-2.5-flash' || modelId.startsWith('gemini-2.5')) {
+          result = await _callFastGenerateContent(
+            model: modelId,
+            input: enrichedInput,
+          );
+        } else {
+          final prevId =
+              (_lastInteractionModel == modelId) ? _previousInteractionId : null;
+
+          result = await _callInteractionsApi(
+            model: modelId,
+            input: enrichedInput,
+            previousInteractionId: prevId,
+          );
+
+          result ??= await _callFastGenerateContent(
+            model: modelId,
+            input: enrichedInput,
+          );
+        }
 
         if (result != null) {
           _currentModelIndex = idx;
@@ -422,8 +442,8 @@ BẢNG MÀU THAM CHIẾU CHUẨN:
     }
 
     if (response.statusCode != 200) {
-      // Try generateContent endpoint as secondary fallback for this model
-      return _callGenerateContentFallback(model: model, input: input);
+      // Try fast generateContent endpoint as secondary fallback for this model
+      return _callFastGenerateContent(model: model, input: input);
     }
 
     final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -440,67 +460,79 @@ BẢNG MÀU THAM CHIẾU CHUẨN:
     return _parseAgentJsonResponse(outputText);
   }
 
-  Future<Map<String, dynamic>?> _callGenerateContentFallback({
+  Future<Map<String, dynamic>?> _callFastGenerateContent({
     required String model,
     required String input,
   }) async {
-    final response = await http
-        .post(
-          Uri.parse('$_modelsBaseUrl/$model:generateContent?key=$_apiKey'),
-          headers: const {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'systemInstruction': {
-              'parts': [
-                {'text': _ledAgentSystemInstruction}
-              ]
-            },
-            'contents': [
-              {
-                'role': 'user',
+    final Map<String, dynamic> generationConfig = {
+      'temperature': 0.1,
+      'maxOutputTokens': 250,
+      'responseMimeType': 'application/json',
+    };
+
+    // If model supports thinking (like gemini-2.5-flash), disable thinking budget to eliminate delay!
+    if (model.contains('2.5')) {
+      generationConfig['thinkingConfig'] = {'thinkingBudget': 0};
+    }
+
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$_modelsBaseUrl/$model:generateContent?key=$_apiKey'),
+            headers: const {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'systemInstruction': {
                 'parts': [
-                  {
-                    'text': '$input\n\n'
-                        'Trả về đúng JSON với cấu trúc: {"response": "câu trả lời tiếng Việt", "commands": [...]}.'
-                  }
+                  {'text': _ledAgentSystemInstruction}
                 ]
-              }
-            ],
-            'generationConfig': {
-              'temperature': 0.25,
-              'maxOutputTokens': 600,
-              'responseMimeType': 'application/json',
-            },
-          }),
-        )
-        .timeout(const Duration(seconds: 10));
+              },
+              'contents': [
+                {
+                  'role': 'user',
+                  'parts': [
+                    {
+                      'text': '$input\n\n'
+                          'Yêu cầu: Trả về DUY NHẤT một chuỗi JSON hợp lệ theo cấu trúc: {"response": "câu trả lời tiếng Việt ngắn gọn", "commands": [...]}.'
+                    }
+                  ]
+                }
+              ],
+              'generationConfig': generationConfig,
+            }),
+          )
+          .timeout(const Duration(seconds: 4));
 
-    if (response.statusCode == 429 || response.statusCode == 503) {
-      _markModelCooldown(model, 'HTTP ${response.statusCode}');
-      _currentModelIndex = (_currentModelIndex + 1) % modelPool.length;
-      return null;
-    }
-
-    if (response.statusCode != 200) {
-      debugPrint(
-        'Gemini generateContent Error ($model): ${response.statusCode}',
-      );
-      return null;
-    }
-
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
-    final candidates = data['candidates'] as List<dynamic>?;
-    if (candidates == null || candidates.isEmpty) return null;
-    final parts =
-        candidates.first['content']?['parts'] as List<dynamic>? ?? const [];
-    final buffer = StringBuffer();
-    for (final p in parts) {
-      if (p is Map && p['text'] != null) {
-        buffer.write(p['text']);
+      if (response.statusCode == 429 || response.statusCode == 503) {
+        _markModelCooldown(model, 'HTTP ${response.statusCode}');
+        _currentModelIndex = (_currentModelIndex + 1) % modelPool.length;
+        return null;
       }
+
+      if (response.statusCode != 200) {
+        debugPrint(
+          'Gemini generateContent Error ($model): ${response.statusCode}',
+        );
+        return null;
+      }
+
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final candidates = data['candidates'] as List<dynamic>?;
+      if (candidates == null || candidates.isEmpty) return null;
+      final parts =
+          candidates.first['content']?['parts'] as List<dynamic>? ?? const [];
+      final buffer = StringBuffer();
+      for (final p in parts) {
+        if (p is Map && p['text'] != null) {
+          buffer.write(p['text']);
+        }
+      }
+      final text = buffer.toString().trim();
+      if (text.isEmpty) return null;
+      return _parseAgentJsonResponse(text);
+    } catch (e) {
+      debugPrint('Fast generateContent error ($model): $e');
+      return null;
     }
-    final text = buffer.toString().trim();
-    if (text.isEmpty) return null;
-    return _parseAgentJsonResponse(text);
   }
 
   Map<String, dynamic>? _parseAgentJsonResponse(String rawText) {
@@ -721,73 +753,105 @@ BẢNG MÀU THAM CHIẾU CHUẨN:
     for (final item in rawCommands) {
       if (item is! Map) continue;
       final cmd = Map<String, dynamic>.from(item);
-      final action = cmd['action'] as String?;
+      final action = cmd['action']?.toString().toLowerCase().trim();
       if (action == null) continue;
 
-      switch (action) {
-        case 'power':
-          final state = (cmd['state'] as String?)?.toLowerCase() == 'off'
-              ? 'off'
-              : 'on';
-          result.add({
-            'action': 'power',
-            'state': state,
-          });
-          break;
-
-        case 'color':
-          final colorMap = cmd['color'] is Map
-              ? Map<String, dynamic>.from(cmd['color'] as Map)
-              : cmd;
-          final r = ((colorMap['r'] as num?)?.toInt() ?? 255).clamp(0, 255);
-          final g = ((colorMap['g'] as num?)?.toInt() ?? 255).clamp(0, 255);
-          final b = ((colorMap['b'] as num?)?.toInt() ?? 255).clamp(0, 255);
-          result.add({
-            'action': 'color',
-            'r': r,
-            'g': g,
-            'b': b,
-          });
-          break;
-
-        case 'brightness':
-          final val = (cmd['brightness'] ?? cmd['value']) as num?;
-          result.add({
-            'action': 'brightness',
-            'value': (val?.toInt() ?? 80).clamp(0, 100),
-          });
-          break;
-
-        case 'effect':
-          final effectMap = cmd['effect'] is Map
-              ? Map<String, dynamic>.from(cmd['effect'] as Map)
-              : cmd;
-          final type = (effectMap['type'] as String?) ?? 'none';
-          final speed =
-              ((effectMap['speed'] as num?)?.toInt() ?? 500).clamp(50, 3000);
-          result.add({
-            'action': 'effect',
-            'type': type,
-            'speed': speed,
-          });
-          break;
-
-        case 'auto_mode':
-          final enabled = (cmd['auto_mode'] ?? cmd['enabled']) as bool? ?? true;
-          result.add({
-            'action': 'auto_mode',
-            'enabled': enabled,
-          });
-          break;
-
-        case 'num_leds':
-          final count =
-              (cmd['num_leds'] ?? cmd['count'] ?? cmd['value']) as num?;
-          result.add({
-            'action': 'num_leds',
-            'count': (count?.toInt() ?? 8).clamp(1, 300),
-          });
-          break;
+      if (action == 'power' ||
+          action == 'turn_on' ||
+          action == 'turnon' ||
+          action == 'turn_off' ||
+          action == 'turnoff') {
+        final state = (action.contains('off') ||
+                (cmd['state'] ?? cmd['value'])?.toString().toLowerCase() ==
+                    'off')
+            ? 'off'
+            : 'on';
+        result.add({
+          'action': 'power',
+          'state': state,
+        });
+      } else if (action == 'color' || action == 'set_color') {
+        int r = 255, g = 255, b = 255;
+        if (cmd['color'] is Map) {
+          final m = cmd['color'] as Map;
+          r = ((m['r'] as num?)?.toInt() ?? 255).clamp(0, 255);
+          g = ((m['g'] as num?)?.toInt() ?? 255).clamp(0, 255);
+          b = ((m['b'] as num?)?.toInt() ?? 255).clamp(0, 255);
+        } else if (cmd['r'] != null || cmd['g'] != null || cmd['b'] != null) {
+          r = ((cmd['r'] as num?)?.toInt() ?? 255).clamp(0, 255);
+          g = ((cmd['g'] as num?)?.toInt() ?? 255).clamp(0, 255);
+          b = ((cmd['b'] as num?)?.toInt() ?? 255).clamp(0, 255);
+        } else {
+          final val = (cmd['value'] ?? cmd['color'] ?? '')
+              .toString()
+              .toLowerCase()
+              .trim();
+          final named = {
+            'red': [255, 0, 0],
+            'đỏ': [255, 0, 0],
+            'green': [0, 255, 0],
+            'xanh lá': [0, 255, 0],
+            'blue': [0, 0, 255],
+            'xanh dương': [0, 0, 255],
+            'yellow': [255, 255, 0],
+            'vàng': [255, 255, 0],
+            'purple': [138, 43, 226],
+            'tím': [138, 43, 226],
+            'orange': [255, 140, 0],
+            'cam': [255, 140, 0],
+            'pink': [255, 105, 180],
+            'hồng': [255, 105, 180],
+            'white': [255, 255, 255],
+            'trắng': [255, 255, 255],
+            'cyan': [0, 255, 255],
+            'xanh ngọc': [0, 255, 255],
+          }[val];
+          if (named != null) {
+            r = named[0];
+            g = named[1];
+            b = named[2];
+          }
+        }
+        result.add({
+          'action': 'color',
+          'r': r,
+          'g': g,
+          'b': b,
+        });
+      } else if (action == 'brightness' || action == 'set_brightness') {
+        final val = (cmd['brightness'] ?? cmd['value']) as num?;
+        result.add({
+          'action': 'brightness',
+          'value': (val?.toInt() ?? 80).clamp(0, 100),
+        });
+      } else if (action == 'effect' || action == 'set_effect') {
+        final effectMap = cmd['effect'] is Map
+            ? Map<String, dynamic>.from(cmd['effect'] as Map)
+            : cmd;
+        final type =
+            (effectMap['type'] ?? effectMap['value'] as String?) ?? 'none';
+        final speed =
+            ((effectMap['speed'] as num?)?.toInt() ?? 500).clamp(50, 3000);
+        result.add({
+          'action': 'effect',
+          'type': type,
+          'speed': speed,
+        });
+      } else if (action == 'auto_mode') {
+        final enabled =
+            (cmd['auto_mode'] ?? cmd['enabled'] ?? cmd['value']) as bool? ??
+                true;
+        result.add({
+          'action': 'auto_mode',
+          'enabled': enabled,
+        });
+      } else if (action == 'num_leds') {
+        final count =
+            (cmd['num_leds'] ?? cmd['count'] ?? cmd['value']) as num?;
+        result.add({
+          'action': 'num_leds',
+          'count': (count?.toInt() ?? 8).clamp(1, 300),
+        });
       }
     }
 
