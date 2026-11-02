@@ -4,6 +4,8 @@ import '../models/mqtt_config.dart';
 import '../services/mqtt_service.dart';
 import '../services/ai_service.dart';
 import '../services/storage_service.dart';
+import '../services/wyoming_stt_service.dart';
+import '../services/vieneu_tts_service.dart';
 import '../providers/led_provider.dart';
 import '../theme/app_theme.dart';
 
@@ -22,6 +24,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _topicPrefixController = TextEditingController();
   final _apiKeyController = TextEditingController();
   final _numLedsController = TextEditingController();
+
+  // Wyoming Vietnamese STT settings
+  final _wyomingHostController = TextEditingController();
+  final _wyomingPortController = TextEditingController();
+  bool _wyomingEnabled = false;
+  bool _isTestingWyoming = false;
+
+  // VieNeu-TTS settings
+  final _vieneuUrlController = TextEditingController();
+  final _vieneuApiKeyController = TextEditingController();
+  String _vieneuVoice = 'Minh Quân';
+  bool _vieneuEnabled = false;
+  bool _isTestingVieNeu = false;
+
   bool _obscurePassword = true;
   bool _obscureApiKey = true;
 
@@ -37,6 +53,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final apiKey = await storage.loadGeminiApiKey();
     final numLeds = await storage.loadNumLeds();
 
+    final wyomingHost = await storage.loadWyomingHost();
+    final wyomingPort = await storage.loadWyomingPort();
+    final wyomingEnabled = await storage.loadWyomingEnabled();
+
+    final vieneuEnabled = await storage.loadVieNeuTtsEnabled();
+    final vieneuUrl = await storage.loadVieNeuTtsUrl();
+    final vieneuVoice = await storage.loadVieNeuTtsVoice();
+    final vieneuApiKey = await storage.loadVieNeuTtsApiKey();
+
     setState(() {
       _brokerController.text = config.broker;
       _portController.text = config.port.toString();
@@ -45,7 +70,95 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _topicPrefixController.text = config.topicPrefix;
       _apiKeyController.text = apiKey;
       _numLedsController.text = numLeds.toString();
+
+      _wyomingHostController.text = wyomingHost;
+      _wyomingPortController.text = wyomingPort.toString();
+      _wyomingEnabled = wyomingEnabled;
+
+      _vieneuEnabled = vieneuEnabled;
+      _vieneuUrlController.text = vieneuUrl;
+      _vieneuVoice = vieneuVoice;
+      _vieneuApiKeyController.text = vieneuApiKey;
     });
+  }
+
+  Future<void> _testWyomingConnection() async {
+    final host = _wyomingHostController.text.trim();
+    final port = int.tryParse(_wyomingPortController.text.trim()) ?? 10300;
+
+    if (host.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Vui lòng nhập địa chỉ IP/Host máy chủ Wyoming.'),
+          backgroundColor: AppTheme.accentOrange,
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isTestingWyoming = true);
+    final wyomingService = WyomingSttService();
+    final ok = await wyomingService.testConnection(host, port);
+    await wyomingService.dispose();
+
+    if (!mounted) return;
+    setState(() => _isTestingWyoming = false);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          ok
+              ? '✅ Kết nối máy chủ Wyoming Vietnamese ($host:$port) thành công!'
+              : '❌ Không thể kết nối tới Wyoming ($host:$port). Hãy kiểm tra IP và cổng.',
+        ),
+        backgroundColor: ok ? AppTheme.accentGreen : AppTheme.accentRed,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+
+  Future<void> _testVieNeuConnection() async {
+    final url = _vieneuUrlController.text.trim();
+    if (url.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Vui lòng nhập địa chỉ máy chủ VieNeu-TTS.'),
+          backgroundColor: AppTheme.accentOrange,
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isTestingVieNeu = true);
+    final vieneuService = context.read<VieNeuTtsService>();
+    final result = await vieneuService.testConnection(
+      baseUrl: url,
+      voice: _vieneuVoice,
+      apiKey: _vieneuApiKeyController.text.trim().isNotEmpty
+          ? _vieneuApiKeyController.text.trim()
+          : null,
+    );
+
+    if (!mounted) return;
+    setState(() => _isTestingVieNeu = false);
+
+    final ok = result['success'] == true;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(result['message'] as String),
+        backgroundColor: ok ? AppTheme.accentGreen : AppTheme.accentRed,
+        duration: const Duration(seconds: 4),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
   }
 
   Future<void> _saveAndConnect() async {
@@ -66,6 +179,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final numLeds = int.tryParse(_numLedsController.text) ?? 30;
     await storage.saveNumLeds(numLeds);
 
+    // Save Wyoming Vietnamese STT config
+    final wyomingPort =
+        int.tryParse(_wyomingPortController.text.trim()) ?? 10300;
+    await storage.saveWyomingConfig(
+      host: _wyomingHostController.text.trim(),
+      port: wyomingPort,
+      enabled: _wyomingEnabled,
+    );
+
+    // Save VieNeu-TTS config
+    await storage.saveVieNeuTtsConfig(
+      enabled: _vieneuEnabled,
+      url: _vieneuUrlController.text.trim(),
+      voice: _vieneuVoice,
+      apiKey: _vieneuApiKeyController.text.trim(),
+    );
+
     if (!mounted) return;
 
     final mqtt = context.read<MqttService>();
@@ -85,11 +215,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
       SnackBar(
         content: Text(
           mqtt.isConnected
-              ? 'Kết nối MQTT thành công!'
-              : 'Lỗi kết nối: ${mqtt.errorMessage}',
+              ? 'Đã lưu cấu hình & kết nối MQTT thành công!'
+              : 'Đã lưu cài đặt. Lỗi MQTT: ${mqtt.errorMessage}',
         ),
         backgroundColor:
-            mqtt.isConnected ? AppTheme.accentGreen : AppTheme.accentRed,
+            mqtt.isConnected ? AppTheme.accentGreen : AppTheme.accentOrange,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
@@ -105,6 +235,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _topicPrefixController.dispose();
     _apiKeyController.dispose();
     _numLedsController.dispose();
+    _wyomingHostController.dispose();
+    _wyomingPortController.dispose();
+    _vieneuUrlController.dispose();
+    _vieneuApiKeyController.dispose();
     super.dispose();
   }
 
@@ -157,7 +291,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         Text(
                           mqtt.isConnected
                               ? 'Đã kết nối MQTT'
-                              : 'Chưa kết nối',
+                              : 'Chưa kết nối MQTT',
                           style: TextStyle(
                             fontWeight: FontWeight.w600,
                             color: mqtt.isConnected
@@ -235,6 +369,254 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(height: 24),
 
+            // Wyoming Vietnamese Speech-to-Text Section
+            _SectionHeader(
+              icon: Icons.mic_external_on_rounded,
+              title: 'Wyoming Vietnamese STT (luuquangvu)',
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppTheme.cardDark,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppTheme.borderDark),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Nhận diện giọng nói qua Wyoming',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                            ),
+                            SizedBox(height: 3),
+                            Text(
+                              'Dùng model Zipformer tiếng Việt chuyên dụng, kháng ồn tốt, nhận diện giọng 3 miền Bắc/Trung/Nam.',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: AppTheme.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Switch(
+                        value: _wyomingEnabled,
+                        activeColor: AppTheme.accentCyan,
+                        onChanged: (v) => setState(() => _wyomingEnabled = v),
+                      ),
+                    ],
+                  ),
+                  if (_wyomingEnabled) ...[
+                    const Divider(color: AppTheme.borderDark, height: 20),
+                    _buildTextField(
+                      controller: _wyomingHostController,
+                      label: 'Địa chỉ Host / IP máy chủ Wyoming',
+                      hint: '192.168.1.100 hoặc localhost',
+                      icon: Icons.lan_rounded,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildTextField(
+                      controller: _wyomingPortController,
+                      label: 'Port Wyoming (mặc định 10300)',
+                      hint: '10300',
+                      icon: Icons.numbers_rounded,
+                      keyboardType: TextInputType.number,
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _isTestingWyoming
+                            ? null
+                            : _testWyomingConnection,
+                        icon: _isTestingWyoming
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: AppTheme.accentCyan,
+                                ),
+                              )
+                            : const Icon(Icons.network_check_rounded, size: 18),
+                        label: Text(
+                          _isTestingWyoming
+                              ? 'Đang kiểm tra...'
+                              : 'Kiểm tra kết nối Wyoming',
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppTheme.accentCyan,
+                          side: const BorderSide(color: AppTheme.accentCyan),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      '💡 Chạy máy chủ bằng Docker: docker run -d -p 10300:10300 ghcr.io/luuquangvu/wyoming-vietnamese',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        color: AppTheme.textSecondary,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // VieNeu-TTS Vietnamese Neural TTS Section
+            _SectionHeader(
+              icon: Icons.record_voice_over_rounded,
+              title: 'VieNeu-TTS (Sửa phát âm tiếng Việt 48kHz)',
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppTheme.cardDark,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppTheme.borderDark),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Giọng đọc nơ-ron VieNeu-TTS',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                            ),
+                            SizedBox(height: 3),
+                            Text(
+                              'Sửa phát âm chuẩn các thuật ngữ LED, WS2812, RGB, lux, cảm biến với âm sắc tiếng Việt 48kHz tự nhiên.',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: AppTheme.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Switch(
+                        value: _vieneuEnabled,
+                        activeColor: AppTheme.accentPurple,
+                        onChanged: (v) => setState(() => _vieneuEnabled = v),
+                      ),
+                    ],
+                  ),
+                  if (_vieneuEnabled) ...[
+                    const Divider(color: AppTheme.borderDark, height: 20),
+                    _buildTextField(
+                      controller: _vieneuUrlController,
+                      label: 'Địa chỉ máy chủ VieNeu-TTS',
+                      hint: 'http://192.168.1.100:23333/v1',
+                      icon: Icons.link_rounded,
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: VieNeuTtsService.availableVoices.contains(_vieneuVoice)
+                          ? _vieneuVoice
+                          : VieNeuTtsService.availableVoices.first,
+                      dropdownColor: AppTheme.surfaceDark,
+                      decoration: InputDecoration(
+                        labelText: 'Giọng đọc tiếng Việt (3 miền)',
+                        prefixIcon: const Icon(
+                          Icons.person_pin_rounded,
+                          color: AppTheme.accentPurple,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide:
+                              const BorderSide(color: AppTheme.borderDark),
+                        ),
+                      ),
+                      items: VieNeuTtsService.availableVoices.map((voice) {
+                        return DropdownMenuItem<String>(
+                          value: voice,
+                          child:
+                              Text(voice, style: const TextStyle(fontSize: 13)),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        if (val != null) setState(() => _vieneuVoice = val);
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    _buildTextField(
+                      controller: _vieneuApiKeyController,
+                      label: 'API Key (Tùy chọn nếu dùng cloud)',
+                      hint: 'Để trống nếu host local',
+                      icon: Icons.key_rounded,
+                      obscureText: true,
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed:
+                            _isTestingVieNeu ? null : _testVieNeuConnection,
+                        icon: _isTestingVieNeu
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: AppTheme.accentPurple,
+                                ),
+                              )
+                            : const Icon(Icons.volume_up_rounded, size: 18),
+                        label: Text(
+                          _isTestingVieNeu
+                              ? 'Đang kiểm tra & đọc thử...'
+                              : 'Kiểm tra kết nối & Thử giọng đọc',
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppTheme.accentPurple,
+                          side: const BorderSide(color: AppTheme.accentPurple),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      '💡 Khởi chạy server: docker run --gpus all -p 23333:23333 pnnbao/vieneu-tts:latest\n'
+                      '⚡ Tự động sửa phát âm: "LED" -> "đèn lét", "WS2812" -> "đúp-liu...", "lux" -> "lắc". (Nếu server offline sẽ tự lùi về giọng máy nội bộ).',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        color: AppTheme.textSecondary,
+                        fontStyle: FontStyle.italic,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+
             // AI Settings
             _SectionHeader(
               icon: Icons.smart_toy_rounded,
@@ -259,17 +641,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            GestureDetector(
-              onTap: () {
-                // Can open browser link later
-              },
-              child: const Text(
-                'Lấy API Key miễn phí tại: aistudio.google.com',
-                style: TextStyle(
-                  color: AppTheme.accentBlue,
-                  fontSize: 12,
-                  decoration: TextDecoration.underline,
-                ),
+            const Text(
+              'Hỗ trợ tự động xoay vòng 9 model Gemini khi hết quota.',
+              style: TextStyle(
+                color: AppTheme.accentBlue,
+                fontSize: 12,
               ),
             ),
             const SizedBox(height: 24),
@@ -351,7 +727,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   Text(
                     'App điều khiển đèn LED thông minh qua MQTT.\n'
                     'Hỗ trợ ESP32 + WS2812 LED Strip.\n'
-                    'Tích hợp AI Gemini cho điều khiển bằng giọng nói.',
+                    'Tích hợp AI Gemini đa model + Wyoming STT + VieNeu-TTS (48kHz).',
                     style: TextStyle(
                       color: AppTheme.textSecondary,
                       fontSize: 12,

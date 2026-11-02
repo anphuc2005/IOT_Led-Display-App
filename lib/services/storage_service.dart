@@ -8,6 +8,13 @@ class StorageService {
   static const String _autoModeKey = 'auto_mode';
   static const String _numLedsKey = 'num_leds';
   static const String _voiceEnabledKey = 'ai_voice_enabled';
+  static const String _wyomingHostKey = 'wyoming_host';
+  static const String _wyomingPortKey = 'wyoming_port';
+  static const String _wyomingEnabledKey = 'wyoming_enabled';
+  static const String _vieneuTtsEnabledKey = 'vieneu_tts_enabled';
+  static const String _vieneuTtsUrlKey = 'vieneu_tts_url';
+  static const String _vieneuTtsVoiceKey = 'vieneu_tts_voice';
+  static const String _vieneuTtsApiKeyKey = 'vieneu_tts_api_key';
 
   /// Compile-time or default environment API Key
   static const String defaultGeminiApiKey =
@@ -69,5 +76,64 @@ class StorageService {
   Future<bool> loadVoiceEnabled() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getBool(_voiceEnabledKey) ?? true;
+  }
+
+  Future<void> saveWyomingConfig({
+    required String host,
+    required int port,
+    required bool enabled,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_wyomingHostKey, host.trim());
+    await prefs.setInt(_wyomingPortKey, port);
+    await prefs.setBool(_wyomingEnabledKey, enabled);
+  }
+
+  Future<String> loadWyomingHost() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_wyomingHostKey) ?? '';
+  }
+
+  Future<int> loadWyomingPort() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt(_wyomingPortKey) ?? 10300;
+  }
+
+  Future<bool> loadWyomingEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_wyomingEnabledKey) ?? false;
+  }
+
+  Future<void> saveVieNeuTtsConfig({
+    required bool enabled,
+    required String url,
+    required String voice,
+    required String apiKey,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_vieneuTtsEnabledKey, enabled);
+    await prefs.setString(_vieneuTtsUrlKey, url.trim());
+    await prefs.setString(_vieneuTtsVoiceKey, voice.trim());
+    await prefs.setString(_vieneuTtsApiKeyKey, apiKey.trim());
+  }
+
+  Future<bool> loadVieNeuTtsEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_vieneuTtsEnabledKey) ?? false;
+  }
+
+  Future<String> loadVieNeuTtsUrl() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_vieneuTtsUrlKey) ?? 'http://192.168.1.100:23333/v1';
+  }
+
+  Future<String> loadVieNeuTtsVoice() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_vieneuTtsVoiceKey) ?? 'Minh Quân';
+  }
+
+  Future<String> loadVieNeuTtsApiKey() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_vieneuTtsApiKeyKey) ?? '';
   }
 }

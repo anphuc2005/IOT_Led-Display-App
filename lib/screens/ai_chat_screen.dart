@@ -12,6 +12,9 @@ import '../models/led_state.dart';
 import '../providers/led_provider.dart';
 import '../services/ai_service.dart';
 import '../services/storage_service.dart';
+import '../services/wyoming_stt_service.dart';
+import '../services/vieneu_tts_service.dart';
+import '../utils/pronunciation_helper.dart';
 import '../theme/app_theme.dart';
 
 class AiChatScreen extends StatefulWidget {
@@ -32,14 +35,23 @@ class _AiChatScreenState extends State<AiChatScreen>
   // Voice TTS & STT
   final FlutterTts _tts = FlutterTts();
   final SpeechToText _speech = SpeechToText();
+  final WyomingSttService _wyomingStt = WyomingSttService();
 
   bool _isLoading = false;
   bool _voiceEnabled = true;
   bool _isSpeaking = false;
   String? _speakingMessageId;
 
+  // VieNeu-TTS settings
+  bool _vieneuEnabled = false;
+  String _vieneuUrl = '';
+  String _vieneuVoice = 'Minh Quân';
+  String _vieneuApiKey = '';
+
   bool _speechAvailable = false;
   bool _isListening = false;
+  bool _isUsingWyoming = false;
+  bool _wyomingConfigured = false;
   String _partialSpeech = '';
   bool _showQuickControls = false;
 
@@ -75,9 +87,51 @@ class _AiChatScreenState extends State<AiChatScreen>
 
   Future<void> _initVoiceServices() async {
     final storage = context.read<StorageService>();
+    final vieneu = context.read<VieNeuTtsService>();
+
     final savedVoice = await storage.loadVoiceEnabled();
+    final wyEnabled = await storage.loadWyomingEnabled();
+    final wyHost = await storage.loadWyomingHost();
+    final vieneuEnabled = await storage.loadVieNeuTtsEnabled();
+    final vieneuUrl = await storage.loadVieNeuTtsUrl();
+    final vieneuVoice = await storage.loadVieNeuTtsVoice();
+    final vieneuApiKey = await storage.loadVieNeuTtsApiKey();
+
     if (mounted) {
-      setState(() => _voiceEnabled = savedVoice);
+      setState(() {
+        _voiceEnabled = savedVoice;
+        _wyomingConfigured = wyEnabled && wyHost.isNotEmpty;
+        _vieneuEnabled = vieneuEnabled && vieneuUrl.isNotEmpty;
+        _vieneuUrl = vieneuUrl;
+        _vieneuVoice = vieneuVoice;
+        _vieneuApiKey = vieneuApiKey;
+      });
+    }
+
+    // Configure VieNeu-TTS listeners
+    try {
+      vieneu.onStart = () {
+        if (mounted) setState(() => _isSpeaking = true);
+      };
+      vieneu.onComplete = () {
+        if (mounted) {
+          setState(() {
+            _isSpeaking = false;
+            _speakingMessageId = null;
+          });
+        }
+      };
+      vieneu.onError = (err) {
+        debugPrint('VieNeu-TTS playback error: $err');
+        if (mounted) {
+          setState(() {
+            _isSpeaking = false;
+            _speakingMessageId = null;
+          });
+        }
+      };
+    } catch (e) {
+      debugPrint('Failed to bind VieNeuTtsService: $e');
     }
 
     // Configure FlutterTts for Vietnamese
@@ -144,7 +198,11 @@ class _AiChatScreenState extends State<AiChatScreen>
   @override
   void dispose() {
     _tts.stop();
+    try {
+      context.read<VieNeuTtsService>().stop();
+    } catch (_) {}
     _speech.stop();
+    _wyomingStt.dispose();
     _waveController.dispose();
     _controller.dispose();
     _scrollController.dispose();
@@ -155,7 +213,7 @@ class _AiChatScreenState extends State<AiChatScreen>
     final next = !_voiceEnabled;
     setState(() => _voiceEnabled = next);
     if (!next && _isSpeaking) {
-      await _tts.stop();
+      await _stopSpeaking();
     }
     if (mounted) {
       await context.read<StorageService>().saveVoiceEnabled(next);
@@ -164,14 +222,33 @@ class _AiChatScreenState extends State<AiChatScreen>
 
   Future<void> _speakText(String messageId, String text) async {
     if (text.trim().isEmpty) return;
+    final normalized = PronunciationHelper.normalizeForTts(text);
+    if (normalized.isEmpty) return;
+
     try {
-      await _tts.stop();
+      await _stopSpeaking();
       if (!mounted) return;
+
       setState(() {
         _isSpeaking = true;
         _speakingMessageId = messageId;
       });
-      await _tts.speak(_sanitizeForTts(text));
+
+      // Try VieNeu-TTS if enabled
+      if (_vieneuEnabled && _vieneuUrl.isNotEmpty) {
+        final vieneu = context.read<VieNeuTtsService>();
+        final ok = await vieneu.speak(
+          text: normalized,
+          baseUrl: _vieneuUrl,
+          voice: _vieneuVoice,
+          apiKey: _vieneuApiKey,
+        );
+        if (ok) return;
+        debugPrint('VieNeu-TTS failed; falling back to local flutter_tts');
+      }
+
+      // Local device TTS fallback
+      await _tts.speak(normalized);
     } catch (e) {
       debugPrint('Error speaking text: $e');
       if (mounted) {
@@ -184,6 +261,10 @@ class _AiChatScreenState extends State<AiChatScreen>
   }
 
   Future<void> _stopSpeaking() async {
+    try {
+      final vieneu = context.read<VieNeuTtsService>();
+      await vieneu.stop();
+    } catch (_) {}
     await _tts.stop();
     if (mounted) {
       setState(() {
@@ -193,31 +274,80 @@ class _AiChatScreenState extends State<AiChatScreen>
     }
   }
 
-  String _sanitizeForTts(String input) {
-    return input
-        .replaceAll(RegExp(r'[*_`#~]'), '')
-        .replaceAll('%', ' phần trăm')
-        .replaceAll('ms', ' mili giây')
-        .trim();
-  }
-
   Future<void> _toggleListening() async {
     if (_isLoading) return;
 
     if (_isListening) {
-      await _speech.stop();
-      setState(() => _isListening = false);
-      if (_controller.text.trim().isNotEmpty) {
-        await _sendMessage();
+      if (_isUsingWyoming) {
+        setState(() => _isListening = false);
+        final transcript = await _wyomingStt.stopListening();
+        if (transcript != null && transcript.trim().isNotEmpty) {
+          _controller.text = transcript.trim();
+          await _sendMessage();
+        }
+      } else {
+        await _speech.stop();
+        setState(() => _isListening = false);
+        if (_controller.text.trim().isNotEmpty) {
+          await _sendMessage();
+        }
       }
       return;
     }
+
+    final storage = context.read<StorageService>();
 
     // Stop AI TTS before listening to user
     if (_isSpeaking) {
       await _stopSpeaking();
     }
+    if (!mounted) return;
 
+    // Check if Wyoming Vietnamese STT is enabled & configured
+    final wyEnabled = await storage.loadWyomingEnabled();
+    final wyHost = await storage.loadWyomingHost();
+    final wyPort = await storage.loadWyomingPort();
+
+    if (wyEnabled && wyHost.isNotEmpty) {
+      _isUsingWyoming = true;
+      setState(() {
+        _isListening = true;
+        _wyomingConfigured = true;
+        _partialSpeech = 'Đang nghe bằng Wyoming Vietnamese STT ($wyHost:$wyPort)...';
+      });
+
+      await _wyomingStt.startListening(
+        host: wyHost,
+        port: wyPort,
+        onTranscriptReceived: (transcript) {
+          if (!mounted) return;
+          if (transcript.isNotEmpty) {
+            _controller.text = transcript;
+            _sendMessage();
+          }
+        },
+        onError: (err) async {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Wyoming lỗi: $err. Đang chuyển sang nhận diện trên máy.'),
+              backgroundColor: AppTheme.accentOrange,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          );
+          await _wyomingStt.cancelListening();
+          _startDeviceListening();
+        },
+      );
+      return;
+    }
+
+    _isUsingWyoming = false;
+    await _startDeviceListening();
+  }
+
+  Future<void> _startDeviceListening() async {
     try {
       if (!_speechAvailable) {
         _speechAvailable = await _speech.initialize(
@@ -253,6 +383,7 @@ class _AiChatScreenState extends State<AiChatScreen>
 
       setState(() {
         _isListening = true;
+        _isUsingWyoming = false;
         _partialSpeech = '';
       });
 
@@ -292,7 +423,11 @@ class _AiChatScreenState extends State<AiChatScreen>
     final ledProvider = context.read<LedProvider>();
 
     if (_isListening) {
-      await _speech.stop();
+      if (_isUsingWyoming) {
+        await _wyomingStt.cancelListening();
+      } else {
+        await _speech.stop();
+      }
       setState(() => _isListening = false);
     }
     if (_isSpeaking) {
@@ -813,30 +948,58 @@ class _AiChatScreenState extends State<AiChatScreen>
                 // Toggle AI Voice button
                 IconButton(
                   tooltip: _voiceEnabled
-                      ? 'Đang bật giọng nói AI (Nhấn để tắt)'
+                      ? (_vieneuEnabled
+                          ? 'Đang bật VieNeu-TTS 48kHz ($_vieneuVoice)'
+                          : 'Đang bật giọng nói AI (Nhấn để tắt)')
                       : 'Đang tắt giọng nói AI (Nhấn để bật)',
                   onPressed: _toggleVoiceEnabled,
                   style: IconButton.styleFrom(
                     backgroundColor: _voiceEnabled
-                        ? AppTheme.accentBlue.withOpacity(0.15)
+                        ? (_vieneuEnabled
+                            ? AppTheme.accentPurple.withOpacity(0.18)
+                            : AppTheme.accentBlue.withOpacity(0.15))
                         : AppTheme.cardDark,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                       side: BorderSide(
                         color: _voiceEnabled
-                            ? AppTheme.accentBlue.withOpacity(0.4)
+                            ? (_vieneuEnabled
+                                ? AppTheme.accentPurple.withOpacity(0.5)
+                                : AppTheme.accentBlue.withOpacity(0.4))
                             : AppTheme.borderDark,
                       ),
                     ),
                   ),
-                  icon: Icon(
-                    _voiceEnabled
-                        ? Icons.volume_up_rounded
-                        : Icons.volume_off_rounded,
-                    color: _voiceEnabled
-                        ? AppTheme.accentBlue
-                        : AppTheme.textSecondary,
-                    size: 20,
+                  icon: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Icon(
+                        _voiceEnabled
+                            ? (_vieneuEnabled
+                                ? Icons.record_voice_over_rounded
+                                : Icons.volume_up_rounded)
+                            : Icons.volume_off_rounded,
+                        color: _voiceEnabled
+                            ? (_vieneuEnabled
+                                ? AppTheme.accentPurple
+                                : AppTheme.accentBlue)
+                            : AppTheme.textSecondary,
+                        size: 20,
+                      ),
+                      if (_voiceEnabled && _vieneuEnabled)
+                        Positioned(
+                          right: 0,
+                          top: 0,
+                          child: Container(
+                            width: 6,
+                            height: 6,
+                            decoration: const BoxDecoration(
+                              color: AppTheme.accentPurple,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
                 const SizedBox(width: 4),
@@ -909,25 +1072,37 @@ class _AiChatScreenState extends State<AiChatScreen>
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
-                color: AppTheme.accentRed.withOpacity(0.12),
+                color: (_isUsingWyoming
+                        ? AppTheme.accentCyan
+                        : AppTheme.accentRed)
+                    .withOpacity(0.12),
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: AppTheme.accentRed.withOpacity(0.4),
+                  color: (_isUsingWyoming
+                          ? AppTheme.accentCyan
+                          : AppTheme.accentRed)
+                      .withOpacity(0.4),
                 ),
               ),
               child: Row(
                 children: [
-                  const Icon(
-                    Icons.graphic_eq_rounded,
-                    color: AppTheme.accentRed,
+                  Icon(
+                    _isUsingWyoming
+                        ? Icons.mic_external_on_rounded
+                        : Icons.graphic_eq_rounded,
+                    color: _isUsingWyoming
+                        ? AppTheme.accentCyan
+                        : AppTheme.accentRed,
                     size: 18,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       _partialSpeech.isEmpty
-                          ? 'Hãy đặt câu hỏi về đèn hoặc nói lệnh điều khiển...'
-                          : '"$_partialSpeech"',
+                          ? (_isUsingWyoming
+                              ? 'Đang nghe bằng Wyoming Vietnamese STT... (Bấm nút Mic để dừng)'
+                              : 'Hãy đặt câu hỏi về đèn hoặc nói lệnh điều khiển...')
+                          : _partialSpeech,
                       style: const TextStyle(
                         color: AppTheme.textPrimary,
                         fontSize: 13,
@@ -938,11 +1113,13 @@ class _AiChatScreenState extends State<AiChatScreen>
                   TextButton(
                     onPressed: _toggleListening,
                     style: TextButton.styleFrom(
-                      foregroundColor: AppTheme.accentRed,
+                      foregroundColor: _isUsingWyoming
+                          ? AppTheme.accentCyan
+                          : AppTheme.accentRed,
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       minimumSize: const Size(0, 28),
                     ),
-                    child: const Text('Gửi ngay'),
+                    child: Text(_isUsingWyoming ? 'Xong' : 'Gửi ngay'),
                   ),
                 ],
               ),
@@ -1041,12 +1218,36 @@ class _AiChatScreenState extends State<AiChatScreen>
                             ]
                           : null,
                     ),
-                    child: Icon(
-                      _isListening ? Icons.stop_rounded : Icons.mic_rounded,
-                      color: _isListening
-                          ? Colors.white
-                          : AppTheme.accentCyan,
-                      size: 22,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Icon(
+                          _isListening
+                              ? Icons.stop_rounded
+                              : (_wyomingConfigured
+                                  ? Icons.mic_external_on_rounded
+                                  : Icons.mic_rounded),
+                          color: _isListening
+                              ? Colors.white
+                              : (_wyomingConfigured
+                                  ? AppTheme.accentCyan
+                                  : AppTheme.textPrimary),
+                          size: 22,
+                        ),
+                        if (_wyomingConfigured && !_isListening)
+                          Positioned(
+                            right: 8,
+                            top: 8,
+                            child: Container(
+                              width: 6,
+                              height: 6,
+                              decoration: const BoxDecoration(
+                                color: AppTheme.accentCyan,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ),

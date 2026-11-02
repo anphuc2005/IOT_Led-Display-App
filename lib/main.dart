@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'services/mqtt_service.dart';
 import 'services/ai_service.dart';
 import 'services/storage_service.dart';
+import 'services/vieneu_tts_service.dart';
 import 'providers/led_provider.dart';
 import 'screens/home_screen.dart';
 import 'theme/app_theme.dart';
@@ -30,6 +31,10 @@ class SmartLedApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => MqttService()),
         ChangeNotifierProvider(create: (_) => AiService()),
         Provider(create: (_) => StorageService()),
+        Provider(
+          create: (_) => VieNeuTtsService(),
+          dispose: (_, service) => service.dispose(),
+        ),
         ChangeNotifierProxyProvider<MqttService, LedProvider>(
           create: (context) => LedProvider(context.read<MqttService>()),
           update: (_, mqtt, led) => led!,

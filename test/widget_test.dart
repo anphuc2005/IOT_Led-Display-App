@@ -1,11 +1,17 @@
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:smart_led_control/models/chat_message.dart';
 import 'package:smart_led_control/models/led_state.dart';
 import 'package:smart_led_control/providers/led_provider.dart';
 import 'package:smart_led_control/services/ai_service.dart';
 import 'package:smart_led_control/services/mqtt_service.dart';
+import 'package:smart_led_control/services/wyoming_stt_service.dart';
+import 'package:smart_led_control/services/vieneu_tts_service.dart';
+import 'package:smart_led_control/utils/pronunciation_helper.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   test('LedProvider.executeCommands updates multi-action LED state properly', () {
     final mqtt = MqttService();
     final provider = LedProvider(mqtt);
@@ -46,5 +52,47 @@ void main() {
     expect(msg.allCommands.length, equals(1));
     expect(msg.allCommands.first['action'], equals('power'));
     expect(msg.modelUsed, equals('gemini-3.5-flash-lite'));
+  });
+
+  test('WyomingSttService initializes and reports not recording', () {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+      const MethodChannel('com.llfbandit.record/messages'),
+      (call) async => null,
+    );
+    final wyoming = WyomingSttService();
+    expect(wyoming.isRecording, isFalse);
+  });
+
+  test('PronunciationHelper correctly normalizes Smart LED technical terms', () {
+    final rawText = '💡 Đã bật đèn LED RGB WS2812 với độ sáng 85% và chu kỳ 50ms.';
+    final normalized = PronunciationHelper.normalizeForTts(rawText);
+
+    expect(normalized.contains('đèn lét'), isTrue);
+    expect(normalized.contains('rờ gờ bê'), isTrue);
+    expect(normalized.contains('đúp-liu ét hai tám một hai'), isTrue);
+    expect(normalized.contains('phần trăm'), isTrue);
+    expect(normalized.contains('mili giây'), isTrue);
+    expect(normalized.contains('💡'), isFalse);
+  });
+
+  test('PronunciationHelper strips json codeblocks and normalizes sensor acronyms', () {
+    final rawText = 'Cảm biến PIR và BH1750 ghi nhận 400lux.\n```json\n{"action": "power"}\n```';
+    final normalized = PronunciationHelper.normalizeForTts(rawText);
+
+    expect(normalized.contains('cảm biến chuyển động pi-a'), isTrue);
+    expect(normalized.contains('bê-hát một bảy năm không'), isTrue);
+    expect(normalized.contains('400 lắc'), isTrue);
+    expect(normalized.contains('json'), isFalse);
+    expect(normalized.contains('action'), isFalse);
+  });
+
+  test('VieNeuTtsService voices list contains standard 3-region voices', () {
+    expect(VieNeuTtsService.availableVoices.contains('Minh Quân'), isTrue);
+    expect(VieNeuTtsService.availableVoices.contains('Mai Phương'), isTrue);
+    expect(VieNeuTtsService.availableVoices.contains('Văn Đức'), isTrue);
+    expect(VieNeuTtsService.availableVoices.contains('Hải Yến'), isTrue);
+    expect(VieNeuTtsService.availableVoices.contains('Quốc Bảo'), isTrue);
+    expect(VieNeuTtsService.availableVoices.contains('Thảo Vy'), isTrue);
   });
 }
