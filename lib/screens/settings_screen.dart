@@ -897,21 +897,35 @@ class _SectionHeader extends StatelessWidget {
     return Row(
       children: [
         Container(
-          padding: const EdgeInsets.all(6),
+          width: 34,
+          height: 34,
           decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: color.withValues(alpha: 0.3)),
+            color: color.withValues(alpha: 0.18),
+            borderRadius: BorderRadius.circular(11),
+            border: Border.all(
+              color: color.withValues(alpha: 0.45),
+              width: 1.1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: color.withValues(alpha: 0.20),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
-          child: Icon(icon, size: 16, color: color),
+          child: Center(
+            child: Icon(icon, size: 18, color: color),
+          ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 12),
         Text(
           title,
           style: const TextStyle(
-            fontSize: 15,
+            fontSize: 15.5,
             fontWeight: FontWeight.w700,
             color: AppTheme.textPrimary,
+            letterSpacing: -0.2,
           ),
         ),
       ],

@@ -186,6 +186,8 @@ class _DashboardView extends StatelessWidget {
     final mqtt = context.watch<MqttService>();
     final led = context.watch<LedProvider>();
     final state = led.ledState;
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final isTablet = screenWidth > 600;
 
     return SafeArea(
       bottom: false,
@@ -297,52 +299,10 @@ class _DashboardView extends StatelessWidget {
                     padding: const EdgeInsets.all(20),
                     child: Row(
                       children: [
-                        // Dynamic 3D Glowing Bulb Disc
-                        Container(
-                          width: 62,
-                          height: 62,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: state.isOn
-                                ? LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: [
-                                      state.color,
-                                      state.color.withValues(alpha: 0.6),
-                                    ],
-                                  )
-                                : LinearGradient(
-                                    colors: [
-                                      Colors.white.withValues(alpha: 0.12),
-                                      Colors.white.withValues(alpha: 0.04),
-                                    ],
-                                  ),
-                            boxShadow: state.isOn
-                                ? [
-                                    BoxShadow(
-                                      color: state.color.withValues(alpha: 0.55),
-                                      blurRadius: 22,
-                                      spreadRadius: 2,
-                                    ),
-                                  ]
-                                : null,
-                            border: Border.all(
-                              color: state.isOn
-                                  ? Colors.white.withValues(alpha: 0.6)
-                                  : Colors.white.withValues(alpha: 0.15),
-                              width: 1.5,
-                            ),
-                          ),
-                          child: Icon(
-                            state.isOn
-                                ? Icons.lightbulb_rounded
-                                : Icons.lightbulb_outline_rounded,
-                            color: state.isOn
-                                ? Colors.white
-                                : AppTheme.textSecondary,
-                            size: 32,
-                          ),
+                        // Dynamic 3D Glowing Bulb Disc with Breathing Pulse
+                        _GlowingBulb3D(
+                          isOn: state.isOn,
+                          color: state.color,
                         ),
                         const SizedBox(width: 18),
                         Expanded(
@@ -589,10 +549,10 @@ class _DashboardView extends StatelessWidget {
                   GridView.count(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    crossAxisCount: 2,
+                    crossAxisCount: isTablet ? 4 : 2,
                     mainAxisSpacing: 12,
                     crossAxisSpacing: 12,
-                    childAspectRatio: 1.55,
+                    childAspectRatio: isTablet ? 1.6 : 1.55,
                     children: [
                       _ActionCard3D(
                         icon: Icons.palette_rounded,
@@ -723,34 +683,58 @@ class _ActionCard3D extends StatelessWidget {
   Widget build(BuildContext context) {
     return LiquidGlassCard(
       borderRadius: 20,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       tintColor: glowColor,
       onTap: onTap,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: glowColor.withValues(alpha: 0.2),
-              border: Border.all(
-                color: glowColor.withValues(alpha: 0.4),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  color: glowColor.withValues(alpha: 0.18),
+                  border: Border.all(
+                    color: glowColor.withValues(alpha: 0.45),
+                    width: 1.1,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: glowColor.withValues(alpha: 0.25),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: Icon(
+                    icon,
+                    color: glowColor,
+                    size: 20,
+                  ),
+                ),
               ),
-            ),
-            child: Icon(
-              icon,
-              color: glowColor,
-              size: 22,
-            ),
+              Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 11,
+                color: Colors.white.withValues(alpha: 0.25),
+              ),
+            ],
           ),
           Text(
             label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               color: AppTheme.textPrimary,
               fontWeight: FontWeight.w700,
               fontSize: 13,
+              letterSpacing: -0.2,
             ),
           ),
         ],
@@ -902,6 +886,107 @@ class _SceneCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Dynamic 3D Glowing Bulb with smooth breathing pulse aura
+class _GlowingBulb3D extends StatefulWidget {
+  final bool isOn;
+  final Color color;
+
+  const _GlowingBulb3D({required this.isOn, required this.color});
+
+  @override
+  State<_GlowingBulb3D> createState() => _GlowingBulb3DState();
+}
+
+class _GlowingBulb3DState extends State<_GlowingBulb3D>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _pulseCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2200),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _pulseCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.isOn) {
+      return Container(
+        width: 62,
+        height: 62,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: LinearGradient(
+            colors: [
+              Colors.white.withValues(alpha: 0.12),
+              Colors.white.withValues(alpha: 0.04),
+            ],
+          ),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.15),
+            width: 1.5,
+          ),
+        ),
+        child: const Icon(
+          Icons.lightbulb_outline_rounded,
+          color: AppTheme.textSecondary,
+          size: 32,
+        ),
+      );
+    }
+
+    return AnimatedBuilder(
+      animation: _pulseCtrl,
+      builder: (context, _) {
+        final t = _pulseCtrl.value;
+        final blur = 18.0 + (t * 12.0);
+        final spread = 1.0 + (t * 2.5);
+        final glowAlpha = 0.45 + (t * 0.30);
+
+        return Container(
+          width: 62,
+          height: 62,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                widget.color,
+                widget.color.withValues(alpha: 0.65),
+              ],
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: widget.color.withValues(alpha: glowAlpha),
+                blurRadius: blur,
+                spreadRadius: spread,
+              ),
+            ],
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.7),
+              width: 1.8,
+            ),
+          ),
+          child: const Icon(
+            Icons.lightbulb_rounded,
+            color: Colors.white,
+            size: 32,
+          ),
+        );
+      },
     );
   }
 }

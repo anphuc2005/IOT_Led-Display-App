@@ -95,6 +95,48 @@ extension LedEffectExt on LedEffect {
         return 'Hiệu ứng đuổi màu chạy dọc dải';
     }
   }
+
+  IconData get iconData {
+    switch (this) {
+      case LedEffect.none:
+        return Icons.wb_incandescent_outlined;
+      case LedEffect.blink:
+        return Icons.flash_on_rounded;
+      case LedEffect.fade:
+        return Icons.blur_on_rounded;
+      case LedEffect.rainbow:
+        return Icons.palette_rounded;
+      case LedEffect.breathing:
+        return Icons.air_rounded;
+      case LedEffect.strobe:
+        return Icons.bolt_rounded;
+      case LedEffect.colorWipe:
+        return Icons.brush_rounded;
+      case LedEffect.chase:
+        return Icons.fast_forward_rounded;
+    }
+  }
+
+  Color get themeColor {
+    switch (this) {
+      case LedEffect.none:
+        return const Color(0xFF94A3B8);
+      case LedEffect.blink:
+        return const Color(0xFFFFB703);
+      case LedEffect.fade:
+        return const Color(0xFF38BDF8);
+      case LedEffect.rainbow:
+        return const Color(0xFFA855F7);
+      case LedEffect.breathing:
+        return const Color(0xFF00F5D4);
+      case LedEffect.strobe:
+        return const Color(0xFFFF2D55);
+      case LedEffect.colorWipe:
+        return const Color(0xFF10B981);
+      case LedEffect.chase:
+        return const Color(0xFFFF007A);
+    }
+  }
 }
 
 class LedState {
@@ -133,9 +175,9 @@ class LedState {
   }
 
   Map<String, dynamic> toColorJson() => {
-        'r': color.red,
-        'g': color.green,
-        'b': color.blue,
+        'r': (color.r * 255.0).round().clamp(0, 255),
+        'g': (color.g * 255.0).round().clamp(0, 255),
+        'b': (color.b * 255.0).round().clamp(0, 255),
       };
 
   Map<String, dynamic> toEffectJson() => {

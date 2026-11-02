@@ -389,9 +389,14 @@ class _AiChatScreenState extends State<AiChatScreen>
       });
 
       await _speech.listen(
-        localeId: 'vi_VN',
-        listenFor: const Duration(seconds: 15),
-        pauseFor: const Duration(seconds: 2),
+        listenOptions: SpeechListenOptions(
+          localeId: 'vi_VN',
+          listenFor: const Duration(seconds: 15),
+          pauseFor: const Duration(seconds: 2),
+          listenMode: ListenMode.confirmation,
+          cancelOnError: false,
+          partialResults: true,
+        ),
         onResult: (SpeechRecognitionResult result) {
           if (!mounted) return;
           setState(() {

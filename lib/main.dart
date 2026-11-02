@@ -130,7 +130,7 @@ class _AppInitializerState extends State<_AppInitializer>
                           borderRadius: BorderRadius.circular(28),
                           boxShadow: [
                             BoxShadow(
-                              color: AppTheme.accentBlue.withOpacity(0.3),
+                              color: AppTheme.accentBlue.withValues(alpha: 0.3),
                               blurRadius: 30,
                               spreadRadius: 5,
                             ),
@@ -169,7 +169,7 @@ class _AppInitializerState extends State<_AppInitializer>
                 height: 32,
                 child: CircularProgressIndicator(
                   strokeWidth: 2.5,
-                  color: AppTheme.accentBlue.withOpacity(0.6),
+                  color: AppTheme.accentBlue.withValues(alpha: 0.6),
                 ),
               ),
             ],

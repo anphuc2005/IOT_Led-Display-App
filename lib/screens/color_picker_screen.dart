@@ -441,6 +441,9 @@ class _ColorPickerScreenState extends State<ColorPickerScreen> {
   }
 
   Widget _buildPresetGrid() {
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final isTablet = screenWidth > 600;
+
     final presets = [
       {'name': 'Hoàng hôn', 'color': const Color(0xFFFF5E36)},
       {'name': 'Lavender', 'color': const Color(0xFFA855F7)},
@@ -459,11 +462,11 @@ class _ColorPickerScreenState extends State<ColorPickerScreen> {
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 4,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: isTablet ? 6 : 4,
         mainAxisSpacing: 14,
         crossAxisSpacing: 12,
-        childAspectRatio: 0.88,
+        childAspectRatio: 0.95,
       ),
       itemCount: presets.length,
       itemBuilder: (context, index) {
