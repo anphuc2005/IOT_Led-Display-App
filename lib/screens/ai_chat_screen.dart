@@ -16,6 +16,7 @@ import '../services/wyoming_stt_service.dart';
 import '../services/vieneu_tts_service.dart';
 import '../utils/pronunciation_helper.dart';
 import '../theme/app_theme.dart';
+import '../widgets/liquid_glass.dart';
 
 class AiChatScreen extends StatefulWidget {
   const AiChatScreen({super.key});
@@ -524,10 +525,10 @@ class _AiChatScreenState extends State<AiChatScreen>
   void _showModelSelectorSheet() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppTheme.surfaceDark,
+      backgroundColor: const Color(0xFF0C111E),
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (ctx) {
         return Consumer<AiService>(
@@ -545,10 +546,10 @@ class _AiChatScreenState extends State<AiChatScreen>
                     children: [
                       Center(
                         child: Container(
-                          width: 40,
+                          width: 44,
                           height: 4,
                           decoration: BoxDecoration(
-                            color: AppTheme.borderDark,
+                            color: Colors.white.withValues(alpha: 0.25),
                             borderRadius: BorderRadius.circular(2),
                           ),
                         ),
@@ -556,18 +557,42 @@ class _AiChatScreenState extends State<AiChatScreen>
                       const SizedBox(height: 16),
                       Row(
                         children: [
-                          const Icon(
-                            Icons.autorenew_rounded,
-                            color: AppTheme.accentCyan,
-                          ),
-                          const SizedBox(width: 10),
-                          const Expanded(
-                            child: Text(
-                              'Xoay vòng Model Gemini AI',
-                              style: TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.bold,
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: AppTheme.accentCyan.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: AppTheme.accentCyan.withValues(alpha: 0.3),
                               ),
+                            ),
+                            child: const Icon(
+                              Icons.autorenew_rounded,
+                              color: AppTheme.accentCyan,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Gemini AI Models',
+                                  style: TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: -0.3,
+                                  ),
+                                ),
+                                Text(
+                                  'Tự động xoay vòng khi hết quota',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppTheme.textSecondary,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                           TextButton.icon(
@@ -584,20 +609,20 @@ class _AiChatScreenState extends State<AiChatScreen>
                             },
                             icon: const Icon(Icons.skip_next_rounded, size: 18),
                             label: const Text('Xoay ngay'),
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppTheme.accentCyan,
+                            ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 12),
                       // Auto-rotate switch card
-                      Container(
+                      LiquidGlassCard(
+                        borderRadius: 16,
+                        tintColor: AppTheme.accentGreen,
                         padding: const EdgeInsets.symmetric(
                           horizontal: 14,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppTheme.cardDark,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: AppTheme.borderDark),
+                          vertical: 10,
                         ),
                         child: Row(
                           children: [
@@ -606,18 +631,18 @@ class _AiChatScreenState extends State<AiChatScreen>
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   const Text(
-                                    'Tự động đổi sang model khác khi hết lượt',
+                                    'Tự động đổi model khi hết quota',
                                     style: TextStyle(
-                                      fontWeight: FontWeight.w600,
+                                      fontWeight: FontWeight.w700,
                                       fontSize: 13,
                                     ),
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    'Khi 1 model báo hết quota (429) hoặc bận (503), Agent tự xoay sang model kế tiếp.',
+                                    'Khi 1 model gặp 429 hoặc bận, tự động chuyển tiếp.',
                                     style: TextStyle(
                                       fontSize: 11,
-                                      color: AppTheme.textSecondary,
+                                      color: AppTheme.textSecondary.withValues(alpha: 0.9),
                                     ),
                                   ),
                                 ],
@@ -625,14 +650,14 @@ class _AiChatScreenState extends State<AiChatScreen>
                             ),
                             Switch(
                               value: ai.autoRotate,
-                              activeColor: AppTheme.accentGreen,
+                              activeThumbColor: AppTheme.accentGreen,
                               onChanged: (v) =>
                                   ai.setModelPreference(autoRotate: v),
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 14),
                       Expanded(
                         child: ListView.builder(
                           controller: scrollCtrl,
@@ -653,16 +678,16 @@ class _AiChatScreenState extends State<AiChatScreen>
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
                                   color: isCurrent
-                                      ? AppTheme.accentBlue.withOpacity(0.12)
-                                      : AppTheme.cardDark,
-                                  borderRadius: BorderRadius.circular(12),
+                                      ? AppTheme.accentCyan.withValues(alpha: 0.15)
+                                      : Colors.white.withValues(alpha: 0.05),
+                                  borderRadius: BorderRadius.circular(14),
                                   border: Border.all(
                                     color: isCurrent
-                                        ? AppTheme.accentBlue
-                                        : onCooldown
-                                            ? AppTheme.accentOrange
-                                                .withOpacity(0.5)
-                                            : AppTheme.borderDark,
+                                        ? AppTheme.accentCyan
+                                        : (onCooldown
+                                            ? AppTheme.accentOrange.withValues(alpha: 0.5)
+                                            : Colors.white.withValues(alpha: 0.12)),
+                                    width: isCurrent ? 1.5 : 1,
                                   ),
                                 ),
                                 child: Row(
@@ -674,7 +699,7 @@ class _AiChatScreenState extends State<AiChatScreen>
                                               ? Icons.timer_outlined
                                               : Icons.radio_button_off_rounded,
                                       color: isCurrent
-                                          ? AppTheme.accentBlue
+                                          ? AppTheme.accentCyan
                                           : onCooldown
                                               ? AppTheme.accentOrange
                                               : AppTheme.textSecondary,
@@ -691,10 +716,10 @@ class _AiChatScreenState extends State<AiChatScreen>
                                               Text(
                                                 m.name,
                                                 style: TextStyle(
-                                                  fontWeight: FontWeight.w600,
+                                                  fontWeight: FontWeight.w700,
                                                   fontSize: 13,
                                                   color: isCurrent
-                                                      ? AppTheme.accentBlue
+                                                      ? AppTheme.accentCyan
                                                       : AppTheme.textPrimary,
                                                 ),
                                               ),
@@ -729,9 +754,13 @@ class _AiChatScreenState extends State<AiChatScreen>
                                         ),
                                         decoration: BoxDecoration(
                                           color: AppTheme.accentGreen
-                                              .withOpacity(0.15),
+                                              .withValues(alpha: 0.2),
                                           borderRadius:
                                               BorderRadius.circular(8),
+                                          border: Border.all(
+                                            color: AppTheme.accentGreen
+                                                .withValues(alpha: 0.4),
+                                          ),
                                         ),
                                         child: const Text(
                                           'Đang dùng',
@@ -781,134 +810,116 @@ class _AiChatScreenState extends State<AiChatScreen>
     return SafeArea(
       child: Column(
         children: [
-          // Header
+          // 3D Liquid Glass Header Capsule
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            child: Row(
-              children: [
-                AnimatedBuilder(
-                  animation: _waveController,
-                  builder: (context, child) {
-                    final active = _isSpeaking || _isListening;
-                    return Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        gradient: _isListening
-                            ? AppTheme.warmGradient
-                            : AppTheme.primaryGradient,
-                        borderRadius: BorderRadius.circular(13),
-                        boxShadow: active
-                            ? [
-                                BoxShadow(
-                                  color: (_isListening
-                                          ? AppTheme.accentRed
-                                          : AppTheme.accentBlue)
-                                      .withOpacity(
-                                          0.25 + _waveController.value * 0.35),
-                                  blurRadius: 12 + _waveController.value * 8,
-                                  spreadRadius: 1 + _waveController.value * 2,
-                                ),
-                              ]
-                            : null,
-                      ),
-                      child: Icon(
-                        _isListening
-                            ? Icons.mic_rounded
-                            : _isSpeaking
-                                ? Icons.graphic_eq_rounded
-                                : Icons.smart_toy_rounded,
-                        color: Colors.white,
-                        size: 22,
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: GestureDetector(
-                    onTap: _showModelSelectorSheet,
-                    behavior: HitTestBehavior.opaque,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Flexible(
-                              child: Text(
-                                'Smart LED Agent',
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppTheme.accentBlue.withOpacity(0.15),
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(
-                                  color: AppTheme.accentBlue.withOpacity(0.35),
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(
-                                    Icons.sync_rounded,
-                                    size: 11,
-                                    color: AppTheme.accentBlue,
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
+            child: LiquidGlassCard(
+              borderRadius: 20,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              child: Row(
+                children: [
+                  AnimatedBuilder(
+                    animation: _waveController,
+                    builder: (context, child) {
+                      final active = _isSpeaking || _isListening;
+                      return Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          gradient: _isListening
+                              ? AppTheme.warmGradient
+                              : AppTheme.primaryGradient,
+                          borderRadius: BorderRadius.circular(13),
+                          boxShadow: active
+                              ? [
+                                  BoxShadow(
+                                    color: (_isListening
+                                            ? AppTheme.accentRed
+                                            : AppTheme.accentCyan)
+                                        .withValues(
+                                            alpha: 0.35 + _waveController.value * 0.35),
+                                    blurRadius: 14 + _waveController.value * 8,
+                                    spreadRadius: 1 + _waveController.value * 2,
                                   ),
-                                  const SizedBox(width: 3),
-                                  Text(
-                                    aiService.currentModelId,
-                                    style: const TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppTheme.accentBlue,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
+                                ]
+                              : null,
                         ),
-                        const SizedBox(height: 2),
-                        Row(
-                          children: [
-                            Container(
-                              width: 7,
-                              height: 7,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: _isListening
-                                    ? AppTheme.accentRed
-                                    : _isSpeaking
-                                        ? AppTheme.accentCyan
-                                        : aiService.hasApiKey
-                                            ? AppTheme.accentGreen
-                                            : AppTheme.accentOrange,
+                        child: Icon(
+                          _isListening
+                              ? Icons.mic_rounded
+                              : _isSpeaking
+                                  ? Icons.graphic_eq_rounded
+                                  : Icons.smart_toy_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: _showModelSelectorSheet,
+                      behavior: HitTestBehavior.opaque,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Flexible(
+                                child: Text(
+                                  'Smart LED Agent',
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 15,
+                                    letterSpacing: -0.3,
+                                  ),
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                _isListening
-                                    ? 'Đang nghe câu hỏi về đèn...'
-                                    : _isSpeaking
-                                        ? 'Agent đang nói & đồng bộ đèn...'
-                                        : _isLoading
-                                            ? 'Đang xử lý (${aiService.currentModelId})...'
-                                            : 'Chuyên gia Đèn LED • Tự xoay 9 model',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.accentCyan.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: AppTheme.accentCyan.withValues(alpha: 0.35),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.sync_rounded,
+                                      size: 11,
+                                      color: AppTheme.accentCyan,
+                                    ),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      aiService.currentModelId,
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppTheme.accentCyan,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              Container(
+                                width: 7,
+                                height: 7,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
                                   color: _isListening
                                       ? AppTheme.accentRed
                                       : _isSpeaking
@@ -916,123 +927,89 @@ class _AiChatScreenState extends State<AiChatScreen>
                                           : aiService.hasApiKey
                                               ? AppTheme.accentGreen
                                               : AppTheme.accentOrange,
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.w500,
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                // Model rotation selector button
-                IconButton(
-                  tooltip: 'Chọn / Xoay vòng Model Gemini',
-                  onPressed: _showModelSelectorSheet,
-                  style: IconButton.styleFrom(
-                    backgroundColor: AppTheme.cardDark,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: const BorderSide(color: AppTheme.borderDark),
-                    ),
-                  ),
-                  icon: const Icon(
-                    Icons.autorenew_rounded,
-                    color: AppTheme.accentCyan,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                // Toggle AI Voice button
-                IconButton(
-                  tooltip: _voiceEnabled
-                      ? (_vieneuEnabled
-                          ? 'Đang bật VieNeu-TTS 48kHz ($_vieneuVoice)'
-                          : 'Đang bật giọng nói AI (Nhấn để tắt)')
-                      : 'Đang tắt giọng nói AI (Nhấn để bật)',
-                  onPressed: _toggleVoiceEnabled,
-                  style: IconButton.styleFrom(
-                    backgroundColor: _voiceEnabled
-                        ? (_vieneuEnabled
-                            ? AppTheme.accentPurple.withOpacity(0.18)
-                            : AppTheme.accentBlue.withOpacity(0.15))
-                        : AppTheme.cardDark,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: BorderSide(
-                        color: _voiceEnabled
-                            ? (_vieneuEnabled
-                                ? AppTheme.accentPurple.withOpacity(0.5)
-                                : AppTheme.accentBlue.withOpacity(0.4))
-                            : AppTheme.borderDark,
-                      ),
-                    ),
-                  ),
-                  icon: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Icon(
-                        _voiceEnabled
-                            ? (_vieneuEnabled
-                                ? Icons.record_voice_over_rounded
-                                : Icons.volume_up_rounded)
-                            : Icons.volume_off_rounded,
-                        color: _voiceEnabled
-                            ? (_vieneuEnabled
-                                ? AppTheme.accentPurple
-                                : AppTheme.accentBlue)
-                            : AppTheme.textSecondary,
-                        size: 20,
-                      ),
-                      if (_voiceEnabled && _vieneuEnabled)
-                        Positioned(
-                          right: 0,
-                          top: 0,
-                          child: Container(
-                            width: 6,
-                            height: 6,
-                            decoration: const BoxDecoration(
-                              color: AppTheme.accentPurple,
-                              shape: BoxShape.circle,
-                            ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  _isListening
+                                      ? 'Đang nghe câu hỏi về đèn...'
+                                      : _isSpeaking
+                                          ? 'Agent đang nói & đồng bộ đèn...'
+                                          : _isLoading
+                                              ? 'Đang xử lý (${aiService.currentModelId})...'
+                                              : 'Chuyên gia Đèn LED • 9 model xoay vòng',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: _isListening
+                                        ? AppTheme.accentRed
+                                        : _isSpeaking
+                                            ? AppTheme.accentCyan
+                                            : aiService.hasApiKey
+                                                ? AppTheme.accentGreen
+                                                : AppTheme.accentOrange,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 4),
-                // Reset conversation button
-                IconButton(
-                  tooltip: 'Làm mới hội thoại',
-                  onPressed: _resetChat,
-                  style: IconButton.styleFrom(
-                    backgroundColor: AppTheme.cardDark,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: const BorderSide(color: AppTheme.borderDark),
+                        ],
+                      ),
                     ),
                   ),
-                  icon: const Icon(
-                    Icons.refresh_rounded,
-                    color: AppTheme.textSecondary,
-                    size: 20,
+                  // Model rotation button
+                  _GlassIconButton(
+                    tooltip: 'Chọn / Xoay vòng Model Gemini',
+                    onTap: _showModelSelectorSheet,
+                    icon: Icons.autorenew_rounded,
+                    iconColor: AppTheme.accentCyan,
                   ),
-                ),
-              ],
+                  const SizedBox(width: 6),
+                  // Voice toggle button
+                  _GlassIconButton(
+                    tooltip: _voiceEnabled
+                        ? (_vieneuEnabled
+                            ? 'VieNeu-TTS 48kHz ($_vieneuVoice)'
+                            : 'Đang bật giọng nói AI')
+                        : 'Giọng nói AI đang tắt',
+                    onTap: _toggleVoiceEnabled,
+                    icon: _voiceEnabled
+                        ? (_vieneuEnabled
+                            ? Icons.record_voice_over_rounded
+                            : Icons.volume_up_rounded)
+                        : Icons.volume_off_rounded,
+                    iconColor: _voiceEnabled
+                        ? (_vieneuEnabled
+                            ? AppTheme.accentPurple
+                            : AppTheme.accentCyan)
+                        : AppTheme.textSecondary,
+                    badgeDot: _voiceEnabled && _vieneuEnabled,
+                    badgeColor: AppTheme.accentPurple,
+                  ),
+                  const SizedBox(width: 6),
+                  // Reset chat button
+                  _GlassIconButton(
+                    tooltip: 'Làm mới hội thoại',
+                    onTap: _resetChat,
+                    icon: Icons.refresh_rounded,
+                    iconColor: AppTheme.textSecondary,
+                  ),
+                ],
+              ),
             ),
           ),
 
           // Live LED Status & Direct Control Strip inside AI Chat
           _buildLiveLedBar(ledProvider, ledState),
-          const Divider(color: AppTheme.borderDark, height: 1),
 
           // Messages
           Expanded(
             child: ListView.builder(
               controller: _scrollController,
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               itemCount: _messages.length + (_isLoading ? 1 : 0),
               itemBuilder: (context, index) {
                 if (index == _messages.length) {
@@ -1067,61 +1044,54 @@ class _AiChatScreenState extends State<AiChatScreen>
 
           // Active listening banner
           if (_isListening)
-            Container(
-              width: double.infinity,
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: (_isUsingWyoming
-                        ? AppTheme.accentCyan
-                        : AppTheme.accentRed)
-                    .withOpacity(0.12),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: (_isUsingWyoming
-                          ? AppTheme.accentCyan
-                          : AppTheme.accentRed)
-                      .withOpacity(0.4),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    _isUsingWyoming
-                        ? Icons.mic_external_on_rounded
-                        : Icons.graphic_eq_rounded,
-                    color: _isUsingWyoming
-                        ? AppTheme.accentCyan
-                        : AppTheme.accentRed,
-                    size: 18,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      _partialSpeech.isEmpty
-                          ? (_isUsingWyoming
-                              ? 'Đang nghe bằng Wyoming Vietnamese STT... (Bấm nút Mic để dừng)'
-                              : 'Hãy đặt câu hỏi về đèn hoặc nói lệnh điều khiển...')
-                          : _partialSpeech,
-                      style: const TextStyle(
-                        color: AppTheme.textPrimary,
-                        fontSize: 13,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: _toggleListening,
-                    style: TextButton.styleFrom(
-                      foregroundColor: _isUsingWyoming
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: LiquidGlassCard(
+                borderRadius: 16,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                tintColor: _isUsingWyoming ? AppTheme.accentCyan : AppTheme.accentRed,
+                child: Row(
+                  children: [
+                    Icon(
+                      _isUsingWyoming
+                          ? Icons.mic_external_on_rounded
+                          : Icons.graphic_eq_rounded,
+                      color: _isUsingWyoming
                           ? AppTheme.accentCyan
                           : AppTheme.accentRed,
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      minimumSize: const Size(0, 28),
+                      size: 20,
                     ),
-                    child: Text(_isUsingWyoming ? 'Xong' : 'Gửi ngay'),
-                  ),
-                ],
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        _partialSpeech.isEmpty
+                            ? (_isUsingWyoming
+                                ? 'Đang nghe bằng Wyoming Vietnamese STT... (Bấm Xong để gửi)'
+                                : 'Hãy đặt câu hỏi về đèn hoặc nói lệnh điều khiển...')
+                            : _partialSpeech,
+                        style: const TextStyle(
+                          color: AppTheme.textPrimary,
+                          fontSize: 13,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: _toggleListening,
+                      style: TextButton.styleFrom(
+                        foregroundColor: _isUsingWyoming
+                            ? AppTheme.accentCyan
+                            : AppTheme.accentRed,
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        minimumSize: const Size(0, 28),
+                      ),
+                      child: Text(
+                        _isUsingWyoming ? 'Xong' : 'Gửi ngay',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
 
@@ -1178,120 +1148,129 @@ class _AiChatScreenState extends State<AiChatScreen>
               ],
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
 
-          // Input Bar with Mic + Text + Send
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppTheme.surfaceDark,
-              border: Border(
-                top: BorderSide(color: AppTheme.borderDark.withOpacity(0.5)),
-              ),
-            ),
-            child: Row(
-              children: [
-                // Microphone button for Speech-to-Text
-                GestureDetector(
-                  onTap: _isLoading ? null : _toggleListening,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    width: 46,
-                    height: 46,
-                    decoration: BoxDecoration(
-                      color: _isListening
-                          ? AppTheme.accentRed
-                          : AppTheme.cardDark,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: _isListening
-                            ? AppTheme.accentRed
-                            : AppTheme.borderDark,
-                      ),
-                      boxShadow: _isListening
-                          ? [
-                              BoxShadow(
-                                color: AppTheme.accentRed.withOpacity(0.4),
-                                blurRadius: 12,
-                                spreadRadius: 2,
-                              ),
-                            ]
-                          : null,
-                    ),
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        Icon(
-                          _isListening
-                              ? Icons.stop_rounded
-                              : (_wyomingConfigured
-                                  ? Icons.mic_external_on_rounded
-                                  : Icons.mic_rounded),
+          // 3D Liquid Glass Floating Input Capsule
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+            child: LiquidGlassCard(
+              borderRadius: 30,
+              padding: const EdgeInsets.all(6),
+              child: Row(
+                children: [
+                  // Microphone button for STT
+                  GestureDetector(
+                    onTap: _isLoading ? null : _toggleListening,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        gradient: _isListening
+                            ? AppTheme.warmGradient
+                            : (_wyomingConfigured
+                                ? const LinearGradient(
+                                    colors: [Color(0xFF00F2FE), Color(0xFF4FACFE)],
+                                  )
+                                : null),
+                        color: (_isListening || _wyomingConfigured)
+                            ? null
+                            : Colors.white.withValues(alpha: 0.08),
+                        shape: BoxShape.circle,
+                        border: Border.all(
                           color: _isListening
-                              ? Colors.white
+                              ? Colors.white.withValues(alpha: 0.6)
                               : (_wyomingConfigured
-                                  ? AppTheme.accentCyan
-                                  : AppTheme.textPrimary),
-                          size: 22,
+                                  ? AppTheme.accentCyan.withValues(alpha: 0.6)
+                                  : Colors.white.withValues(alpha: 0.2)),
+                          width: 1.2,
                         ),
-                        if (_wyomingConfigured && !_isListening)
-                          Positioned(
-                            right: 8,
-                            top: 8,
-                            child: Container(
-                              width: 6,
-                              height: 6,
-                              decoration: const BoxDecoration(
-                                color: AppTheme.accentCyan,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
+                        boxShadow: _isListening
+                            ? [
+                                BoxShadow(
+                                  color: AppTheme.accentRed.withValues(alpha: 0.5),
+                                  blurRadius: 14,
+                                  spreadRadius: 2,
+                                ),
+                              ]
+                            : (_wyomingConfigured
+                                ? [
+                                    BoxShadow(
+                                      color: AppTheme.accentCyan.withValues(alpha: 0.35),
+                                      blurRadius: 10,
+                                    ),
+                                  ]
+                                : null),
+                      ),
+                      child: Icon(
+                        _isListening
+                            ? Icons.stop_rounded
+                            : (_wyomingConfigured
+                                ? Icons.mic_external_on_rounded
+                                : Icons.mic_rounded),
+                        color: (_isListening || _wyomingConfigured)
+                            ? Colors.white
+                            : AppTheme.textPrimary,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      controller: _controller,
+                      style: const TextStyle(
+                        color: AppTheme.textPrimary,
+                        fontSize: 14,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: _isListening
+                            ? 'Đang nghe câu hỏi về đèn...'
+                            : 'Hỏi về đèn hoặc ra lệnh điều khiển...',
+                        hintStyle: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.35),
+                          fontSize: 13,
+                        ),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 10,
+                        ),
+                      ),
+                      onSubmitted: (_) => _sendMessage(),
+                      textInputAction: TextInputAction.send,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  // 3D Send Button
+                  GestureDetector(
+                    onTap: _isLoading ? null : () => _sendMessage(),
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        gradient: AppTheme.primaryGradient,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.4),
+                          width: 1.2,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppTheme.accentCyan.withValues(alpha: 0.35),
+                            blurRadius: 10,
                           ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: TextField(
-                    controller: _controller,
-                    decoration: InputDecoration(
-                      hintText: _isListening
-                          ? 'Đang nghe câu hỏi về đèn...'
-                          : 'Hỏi về đèn hoặc yêu cầu điều chỉnh đèn...',
-                      filled: true,
-                      fillColor: AppTheme.cardDark,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24),
-                        borderSide: BorderSide.none,
+                        ],
                       ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 18,
-                        vertical: 12,
+                      child: Icon(
+                        _isLoading ? Icons.hourglass_top : Icons.arrow_upward_rounded,
+                        color: Colors.white,
+                        size: 20,
                       ),
                     ),
-                    onSubmitted: (_) => _sendMessage(),
-                    textInputAction: TextInputAction.send,
                   ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  width: 46,
-                  height: 46,
-                  decoration: BoxDecoration(
-                    gradient: AppTheme.primaryGradient,
-                    borderRadius: BorderRadius.circular(23),
-                  ),
-                  child: IconButton(
-                    onPressed: _isLoading ? null : () => _sendMessage(),
-                    icon: Icon(
-                      _isLoading ? Icons.hourglass_top : Icons.send_rounded,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],
@@ -1303,219 +1282,221 @@ class _AiChatScreenState extends State<AiChatScreen>
     final isOn = ledState.isOn;
     final color = ledState.color;
 
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppTheme.cardDark,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: isOn ? color.withOpacity(0.45) : AppTheme.borderDark,
-        ),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              // Live glowing bulb icon
-              GestureDetector(
-                onTap: () => ledProvider.togglePower(!isOn),
-                child: Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    color:
-                        isOn ? color.withOpacity(0.25) : AppTheme.surfaceDark,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: isOn ? color : AppTheme.borderDark,
-                      width: 1.5,
-                    ),
-                    boxShadow: isOn
-                        ? [
-                            BoxShadow(
-                              color: color.withOpacity(0.45),
-                              blurRadius: 8,
-                              spreadRadius: 1,
-                            ),
-                          ]
-                        : null,
-                  ),
-                  child: Icon(
-                    isOn
-                        ? Icons.lightbulb_rounded
-                        : Icons.lightbulb_outline_rounded,
-                    color: isOn ? color : AppTheme.textSecondary,
-                    size: 18,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: GestureDetector(
-                  onTap: () =>
-                      setState(() => _showQuickControls = !_showQuickControls),
-                  behavior: HitTestBehavior.opaque,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text(
-                            isOn ? 'Đèn đang BẬT' : 'Đèn đang TẮT',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 13,
-                              color: isOn
-                                  ? AppTheme.textPrimary
-                                  : AppTheme.textSecondary,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          if (ledProvider.autoMode)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 1,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppTheme.accentCyan.withOpacity(0.15),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: const Text(
-                                'AUTO',
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.accentCyan,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Độ sáng: ${ledState.brightness}% • ${ledState.effect.icon} ${ledState.effect.displayName}',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: AppTheme.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              // Expand/Collapse manual quick controls
-              IconButton(
-                tooltip: 'Mở bảng chỉnh nhanh',
-                visualDensity: VisualDensity.compact,
-                onPressed: () =>
-                    setState(() => _showQuickControls = !_showQuickControls),
-                icon: Icon(
-                  _showQuickControls
-                      ? Icons.expand_less_rounded
-                      : Icons.tune_rounded,
-                  size: 18,
-                  color: AppTheme.textSecondary,
-                ),
-              ),
-              // Quick Power Switch
-              Transform.scale(
-                scale: 0.8,
-                child: Switch(
-                  value: isOn,
-                  onChanged: (v) => ledProvider.togglePower(v),
-                  activeColor: AppTheme.accentBlue,
-                ),
-              ),
-            ],
-          ),
-
-          // Expandable direct controls right inside AI Chat
-          if (_showQuickControls) ...[
-            const Divider(color: AppTheme.borderDark, height: 14),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: LiquidGlassCard(
+        borderRadius: 18,
+        tintColor: isOn ? color : null,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        child: Column(
+          children: [
             Row(
               children: [
-                const Icon(
-                  Icons.brightness_6_rounded,
-                  size: 16,
-                  color: AppTheme.textSecondary,
-                ),
-                Expanded(
-                  child: SliderTheme(
-                    data: SliderTheme.of(context).copyWith(
-                      trackHeight: 4,
-                      thumbShape: const RoundSliderThumbShape(
-                        enabledThumbRadius: 7,
+                // Live glowing bulb icon
+                GestureDetector(
+                  onTap: () => ledProvider.togglePower(!isOn),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 250),
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: isOn ? color.withValues(alpha: 0.25) : Colors.white.withValues(alpha: 0.05),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: isOn ? color : Colors.white.withValues(alpha: 0.2),
+                        width: 1.5,
                       ),
-                      overlayShape: const RoundSliderOverlayShape(
-                        overlayRadius: 14,
-                      ),
+                      boxShadow: isOn
+                          ? [
+                              BoxShadow(
+                                color: color.withValues(alpha: 0.5),
+                                blurRadius: 12,
+                                spreadRadius: 2,
+                              ),
+                            ]
+                          : null,
                     ),
-                    child: Slider(
-                      value: ledState.brightness.toDouble(),
-                      min: 0,
-                      max: 100,
-                      activeColor: AppTheme.accentBlue,
-                      onChanged: (v) => ledProvider.setBrightness(v.toInt()),
+                    child: Icon(
+                      isOn
+                          ? Icons.lightbulb_rounded
+                          : Icons.lightbulb_outline_rounded,
+                      color: isOn ? color : AppTheme.textSecondary,
+                      size: 20,
                     ),
                   ),
                 ),
-                SizedBox(
-                  width: 38,
-                  child: Text(
-                    '${ledState.brightness}%',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.accentBlue,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () =>
+                        setState(() => _showQuickControls = !_showQuickControls),
+                    behavior: HitTestBehavior.opaque,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              isOn ? 'Đèn đang BẬT' : 'Đèn đang TẮT',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                                color: isOn
+                                    ? AppTheme.textPrimary
+                                    : AppTheme.textSecondary,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            if (ledProvider.autoMode)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 1,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.accentCyan.withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: AppTheme.accentCyan.withValues(alpha: 0.4),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'AUTO',
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.accentCyan,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Độ sáng: ${ledState.brightness}% • ${ledState.effect.icon} ${ledState.effect.displayName}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppTheme.textSecondary,
+                          ),
+                        ),
+                      ],
                     ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Mở bảng chỉnh nhanh',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () =>
+                      setState(() => _showQuickControls = !_showQuickControls),
+                  icon: Icon(
+                    _showQuickControls
+                        ? Icons.expand_less_rounded
+                        : Icons.tune_rounded,
+                    size: 18,
+                    color: AppTheme.textSecondary,
+                  ),
+                ),
+                Transform.scale(
+                  scale: 0.8,
+                  child: Switch(
+                    value: isOn,
+                    onChanged: (v) => ledProvider.togglePower(v),
+                    activeThumbColor: AppTheme.accentCyan,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 6),
-            // Quick color dots
-            SizedBox(
-              height: 28,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
+            if (_showQuickControls) ...[
+              const Divider(color: Colors.white12, height: 16),
+              Row(
                 children: [
-                  for (final preset in const [
-                    Color(0xFFFFFFFF),
-                    Color(0xFFFFB464),
-                    Color(0xFFFF0000),
-                    Color(0xFF00FF00),
-                    Color(0xFF0066FF),
-                    Color(0xFFFFFF00),
-                    Color(0xFF8A2BE2),
-                    Color(0xFF00FFFF),
-                    Color(0xFFFF69B4),
-                  ])
-                    GestureDetector(
-                      onTap: () {
-                        if (!ledState.isOn) ledProvider.togglePower(true);
-                        ledProvider.setColor(preset);
-                      },
-                      child: Container(
-                        width: 24,
-                        height: 24,
-                        margin: const EdgeInsets.only(right: 8),
-                        decoration: BoxDecoration(
-                          color: preset,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.white54,
-                            width: 1.5,
+                  const Icon(
+                    Icons.brightness_6_rounded,
+                    size: 16,
+                    color: AppTheme.accentOrange,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        trackHeight: 4,
+                        thumbShape: const RoundSliderThumbShape(
+                          enabledThumbRadius: 7,
+                        ),
+                        overlayShape: const RoundSliderOverlayShape(
+                          overlayRadius: 14,
+                        ),
+                        activeTrackColor: AppTheme.accentCyan,
+                        thumbColor: Colors.white,
+                      ),
+                      child: Slider(
+                        value: ledState.brightness.toDouble(),
+                        min: 0,
+                        max: 100,
+                        onChanged: (v) => ledProvider.setBrightness(v.toInt()),
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 36,
+                    child: Text(
+                      '${ledState.brightness}%',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.accentCyan,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              SizedBox(
+                height: 28,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    for (final preset in const [
+                      Color(0xFFFFFFFF),
+                      Color(0xFFFFB464),
+                      Color(0xFFFF007A),
+                      Color(0xFF00F2FE),
+                      Color(0xFF10B981),
+                      Color(0xFFA855F7),
+                      Color(0xFFF59E0B),
+                      Color(0xFF0066FF),
+                    ])
+                      GestureDetector(
+                        onTap: () {
+                          if (!ledState.isOn) ledProvider.togglePower(true);
+                          ledProvider.setColor(preset);
+                        },
+                        child: Container(
+                          width: 26,
+                          height: 26,
+                          margin: const EdgeInsets.only(right: 8),
+                          decoration: BoxDecoration(
+                            color: preset,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.6),
+                              width: 1.5,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: preset.withValues(alpha: 0.35),
+                                blurRadius: 6,
+                              ),
+                            ],
                           ),
                         ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
-            ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -1525,34 +1506,35 @@ class _AiChatScreenState extends State<AiChatScreen>
       alignment: Alignment.centerLeft,
       child: Container(
         margin: const EdgeInsets.only(top: 8, right: 60),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: AppTheme.cardDark,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppTheme.borderDark),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: AppTheme.accentBlue.withOpacity(0.8),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Flexible(
-              child: Text(
-                'Smart LED Agent ($currentModel) đang xử lý...',
-                style: const TextStyle(
-                  color: AppTheme.textSecondary,
-                  fontSize: 13,
+        child: LiquidGlassCard(
+          borderRadius: 18,
+          blur: 16,
+          tintColor: AppTheme.accentCyan,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppTheme.accentCyan,
                 ),
               ),
-            ),
-          ],
+              const SizedBox(width: 12),
+              Flexible(
+                child: Text(
+                  'Smart LED Agent ($currentModel) đang xử lý...',
+                  style: const TextStyle(
+                    color: AppTheme.textPrimary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1665,189 +1647,193 @@ class _ChatBubbleState extends State<_ChatBubble> {
         child: Container(
           margin: EdgeInsets.only(
             top: 10,
-            left: isUser ? 52 : 0,
+            left: isUser ? 48 : 0,
             right: isUser ? 0 : 36,
           ),
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            gradient: isUser ? AppTheme.primaryGradient : null,
-            color: isUser ? null : AppTheme.cardDark,
-            borderRadius: BorderRadius.only(
-              topLeft: const Radius.circular(16),
-              topRight: const Radius.circular(16),
-              bottomLeft: Radius.circular(isUser ? 16 : 4),
-              bottomRight: Radius.circular(isUser ? 4 : 16),
-            ),
-            border: isUser
-                ? null
-                : Border.all(
-                    color: widget.isSpeaking
-                        ? AppTheme.accentCyan.withOpacity(0.6)
-                        : AppTheme.borderDark,
-                  ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Text content with streaming cursor when active
-              RichText(
-                text: TextSpan(
-                  style: TextStyle(
-                    color: isUser ? Colors.white : AppTheme.textPrimary,
-                    fontSize: 14,
-                    height: 1.45,
-                  ),
-                  children: [
-                    TextSpan(text: _displayedText),
-                    if (_isStreaming)
-                      const TextSpan(
-                        text: ' ▍',
-                        style: TextStyle(
-                          color: AppTheme.accentCyan,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-
-              // Executed MQTT command badges
-              if (commands.isNotEmpty) ...[
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: commands.map(_buildCommandBadge).toList(),
-                ),
-                const SizedBox(height: 6),
-                // Toggleable raw JSON signal view
-                GestureDetector(
-                  onTap: () => setState(() => _showRawSignal = !_showRawSignal),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
+          child: LiquidGlassCard(
+            borderRadius: 20,
+            blur: isUser ? 12 : 18,
+            padding: const EdgeInsets.all(14),
+            tintColor: isUser ? null : (widget.isSpeaking ? AppTheme.accentCyan : null),
+            tintGradient: isUser
+                ? const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xFF7928CA), // Electric Violet
+                      Color(0xFF2563EB), // Deep Royal Blue
+                      Color(0xFF00F2FE), // Cyan highlight
+                    ],
+                  )
+                : null,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Text content with streaming cursor when active
+                RichText(
+                  text: TextSpan(
+                    style: TextStyle(
+                      color: isUser ? Colors.white : AppTheme.textPrimary,
+                      fontSize: 14,
+                      height: 1.45,
+                    ),
                     children: [
-                      Icon(
-                        _showRawSignal
-                            ? Icons.code_off_rounded
-                            : Icons.code_rounded,
-                        size: 13,
-                        color: AppTheme.textSecondary,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        _showRawSignal
-                            ? 'Ẩn tín hiệu JSON'
-                            : 'Xem tín hiệu điều khiển (${commands.length} lệnh)',
-                        style: const TextStyle(
-                          color: AppTheme.textSecondary,
-                          fontSize: 11,
-                          decoration: TextDecoration.underline,
+                      TextSpan(text: _displayedText),
+                      if (_isStreaming)
+                        const TextSpan(
+                          text: ' ▍',
+                          style: TextStyle(
+                            color: AppTheme.accentCyan,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
                     ],
                   ),
                 ),
-                if (_showRawSignal) ...[
-                  const SizedBox(height: 6),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryDark,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppTheme.borderDark),
-                    ),
-                    child: Text(
-                      const JsonEncoder.withIndent('  ').convert(commands),
-                      style: const TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: 11,
-                        color: AppTheme.accentCyan,
-                      ),
-                    ),
-                  ),
-                ],
-              ],
 
-              // Bottom row for AI message: Speak/Replay button & Model badge
-              if (!isUser) ...[
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 4,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    InkWell(
-                      onTap: widget.onToggleSpeak,
-                      borderRadius: BorderRadius.circular(12),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
+                // Executed MQTT command badges
+                if (commands.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: commands.map(_buildCommandBadge).toList(),
+                  ),
+                  const SizedBox(height: 6),
+                  // Toggleable raw JSON signal view
+                  GestureDetector(
+                    onTap: () => setState(() => _showRawSignal = !_showRawSignal),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _showRawSignal
+                              ? Icons.code_off_rounded
+                              : Icons.code_rounded,
+                          size: 13,
+                          color: AppTheme.textSecondary,
                         ),
-                        decoration: BoxDecoration(
-                          color: widget.isSpeaking
-                              ? AppTheme.accentCyan.withOpacity(0.15)
-                              : AppTheme.surfaceDark,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: widget.isSpeaking
-                                ? AppTheme.accentCyan.withOpacity(0.4)
-                                : AppTheme.borderDark,
+                        const SizedBox(width: 4),
+                        Text(
+                          _showRawSignal
+                              ? 'Ẩn tín hiệu JSON'
+                              : 'Xem tín hiệu điều khiển (${commands.length} lệnh)',
+                          style: const TextStyle(
+                            color: AppTheme.textSecondary,
+                            fontSize: 11,
+                            decoration: TextDecoration.underline,
                           ),
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              widget.isSpeaking
-                                  ? Icons.stop_circle_outlined
-                                  : Icons.volume_up_rounded,
-                              size: 13,
+                      ],
+                    ),
+                  ),
+                  if (_showRawSignal) ...[
+                    const SizedBox(height: 6),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.35),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppTheme.accentCyan.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Text(
+                        const JsonEncoder.withIndent('  ').convert(commands),
+                        style: const TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 11,
+                          color: AppTheme.accentCyan,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+
+                // Bottom row for AI message: Speak/Replay button & Model badge
+                if (!isUser) ...[
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      InkWell(
+                        onTap: widget.onToggleSpeak,
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: widget.isSpeaking
+                                ? AppTheme.accentCyan.withValues(alpha: 0.2)
+                                : Colors.white.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
                               color: widget.isSpeaking
-                                  ? AppTheme.accentCyan
-                                  : AppTheme.textSecondary,
+                                  ? AppTheme.accentCyan.withValues(alpha: 0.6)
+                                  : Colors.white.withValues(alpha: 0.16),
                             ),
-                            const SizedBox(width: 4),
-                            Text(
-                              widget.isSpeaking ? 'Đang nói (Dừng)' : 'Đọc lại',
-                              style: TextStyle(
-                                fontSize: 11,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                widget.isSpeaking
+                                    ? Icons.stop_circle_outlined
+                                    : Icons.volume_up_rounded,
+                                size: 13,
                                 color: widget.isSpeaking
                                     ? AppTheme.accentCyan
                                     : AppTheme.textSecondary,
-                                fontWeight: widget.isSpeaking
-                                    ? FontWeight.w600
-                                    : FontWeight.normal,
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    if (widget.message.modelUsed != null)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 7,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppTheme.surfaceDark,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: AppTheme.borderDark),
-                        ),
-                        child: Text(
-                          '🤖 ${widget.message.modelUsed}',
-                          style: const TextStyle(
-                            fontSize: 10,
-                            color: AppTheme.textSecondary,
+                              const SizedBox(width: 5),
+                              Text(
+                                widget.isSpeaking ? 'Đang nói (Dừng)' : 'Đọc lại',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: widget.isSpeaking
+                                      ? AppTheme.accentCyan
+                                      : AppTheme.textSecondary,
+                                  fontWeight: widget.isSpeaking
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
-                  ],
-                ),
+                      if (widget.message.modelUsed != null)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.06),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.12),
+                            ),
+                          ),
+                          child: Text(
+                            '🤖 ${widget.message.modelUsed}',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                              color: AppTheme.textSecondary,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
@@ -1879,11 +1865,17 @@ class _ChatBubbleState extends State<_ChatBubble> {
           decoration: BoxDecoration(
             color: c,
             shape: BoxShape.circle,
-            border: Border.all(color: Colors.white54, width: 1),
+            border: Border.all(color: Colors.white, width: 1.2),
+            boxShadow: [
+              BoxShadow(
+                color: c.withValues(alpha: 0.5),
+                blurRadius: 4,
+              ),
+            ],
           ),
         );
-        label = 'Màu RGB($r, $g, $b)';
-        badgeColor = AppTheme.accentBlue;
+        label = 'RGB($r, $g, $b)';
+        badgeColor = AppTheme.accentCyan;
         break;
       case 'brightness':
         final val = (cmd['value'] as num?)?.toInt() ?? 100;
@@ -1919,9 +1911,18 @@ class _ChatBubbleState extends State<_ChatBubble> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: badgeColor.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: badgeColor.withOpacity(0.35)),
+        color: badgeColor.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: badgeColor.withValues(alpha: 0.45),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: badgeColor.withValues(alpha: 0.15),
+            blurRadius: 6,
+          ),
+        ],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1936,7 +1937,7 @@ class _ChatBubbleState extends State<_ChatBubble> {
             style: TextStyle(
               color: badgeColor,
               fontSize: 11,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],
@@ -1953,21 +1954,76 @@ class _QuickChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(right: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: AppTheme.cardDark,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppTheme.borderDark),
-        ),
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: LiquidGlassChip(
+        onTap: onTap,
+        accentColor: AppTheme.accentCyan,
         child: Text(
           label,
           style: const TextStyle(
             fontSize: 12,
-            color: AppTheme.textSecondary,
+            fontWeight: FontWeight.w500,
+            color: AppTheme.textPrimary,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _GlassIconButton extends StatelessWidget {
+  final String tooltip;
+  final VoidCallback onTap;
+  final IconData icon;
+  final Color iconColor;
+  final bool badgeDot;
+  final Color? badgeColor;
+
+  const _GlassIconButton({
+    required this.tooltip,
+    required this.onTap,
+    required this.icon,
+    required this.iconColor,
+    this.badgeDot = false,
+    this.badgeColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.16),
+              width: 1,
+            ),
+          ),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Icon(icon, color: iconColor, size: 18),
+              if (badgeDot)
+                Positioned(
+                  top: 5,
+                  right: 5,
+                  child: Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: badgeColor ?? AppTheme.accentCyan,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
       ),

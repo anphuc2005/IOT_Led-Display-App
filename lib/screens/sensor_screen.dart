@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../providers/led_provider.dart';
 import '../theme/app_theme.dart';
+import '../widgets/liquid_glass.dart';
 
 class SensorScreen extends StatelessWidget {
   const SensorScreen({super.key});
@@ -14,97 +15,86 @@ class SensorScreen extends StatelessWidget {
     final history = led.lightHistory;
 
     return SafeArea(
+      bottom: false,
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Cảm Biến',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-            const SizedBox(height: 8),
             const Text(
-              'Dữ liệu realtime từ ESP32',
-              style: TextStyle(color: AppTheme.textSecondary),
+              'Cảm Biến Realtime',
+              style: TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.5,
+                color: AppTheme.textPrimary,
+              ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 4),
+            const Text(
+              'Theo dõi dữ liệu cảm biến ánh sáng BH1750 & chuyển động PIR từ ESP32',
+              style: TextStyle(
+                color: AppTheme.textSecondary,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 22),
 
-            // Sensor cards row
+            // 3D Liquid Glass Sensor cards row
             Row(
               children: [
                 Expanded(
-                  child: _SensorInfoCard(
+                  child: _SensorCard3D(
                     icon: Icons.wb_sunny_rounded,
-                    label: 'Ánh sáng',
+                    label: 'Ánh sáng phòng',
                     value: '${sensor.lightIntensity.toStringAsFixed(0)} lux',
                     status: sensor.lightLevel,
-                    color: AppTheme.accentOrange,
-                    gradient: AppTheme.warmGradient,
+                    accentColor: AppTheme.accentOrange,
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: _SensorInfoCard(
+                  child: _SensorCard3D(
                     icon: Icons.directions_walk_rounded,
-                    label: 'Chuyển động',
-                    value: sensor.motionDetected ? 'Phát hiện' : 'Không',
-                    status: sensor.motionDetected ? 'Có người' : 'Không có',
-                    color: sensor.motionDetected
+                    label: 'Chuyển động PIR',
+                    value: sensor.motionDetected ? 'Phát hiện' : 'Không có',
+                    status: sensor.motionDetected ? 'Có người di chuyển' : 'Không gian tĩnh',
+                    accentColor: sensor.motionDetected
                         ? AppTheme.accentGreen
                         : AppTheme.textSecondary,
-                    gradient: sensor.motionDetected
-                        ? AppTheme.cyanGradient
-                        : const LinearGradient(
-                            colors: [
-                              AppTheme.textTertiary,
-                              AppTheme.textSecondary,
-                            ],
-                          ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 18),
 
-            // Auto mode toggle
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: led.autoMode
-                    ? LinearGradient(
-                        colors: [
-                          AppTheme.accentGreen.withOpacity(0.1),
-                          AppTheme.accentCyan.withOpacity(0.1),
-                        ],
-                      )
-                    : null,
-                color: led.autoMode ? null : AppTheme.cardDark,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: led.autoMode
-                      ? AppTheme.accentGreen.withOpacity(0.3)
-                      : AppTheme.borderDark,
-                ),
-              ),
+            // Auto mode toggle (3D Liquid Glass)
+            LiquidGlassCard(
+              borderRadius: 24,
+              tintColor: led.autoMode ? AppTheme.accentGreen : null,
               child: Row(
                 children: [
                   Container(
-                    width: 48,
-                    height: 48,
+                    width: 50,
+                    height: 50,
                     decoration: BoxDecoration(
                       color: led.autoMode
-                          ? AppTheme.accentGreen.withOpacity(0.15)
-                          : AppTheme.surfaceDark,
-                      borderRadius: BorderRadius.circular(14),
+                          ? AppTheme.accentGreen.withValues(alpha: 0.25)
+                          : Colors.white.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: led.autoMode
+                            ? AppTheme.accentGreen.withValues(alpha: 0.5)
+                            : Colors.white.withValues(alpha: 0.2),
+                      ),
                     ),
                     child: Icon(
                       Icons.auto_mode_rounded,
                       color: led.autoMode
                           ? AppTheme.accentGreen
                           : AppTheme.textSecondary,
+                      size: 26,
                     ),
                   ),
                   const SizedBox(width: 14),
@@ -113,17 +103,18 @@ class SensorScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'Chế độ tự động',
+                          'Chế độ cảm biến thông minh',
                           style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
+                            color: AppTheme.textPrimary,
                           ),
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: 3),
                         Text(
                           led.autoMode
-                              ? 'Tự chỉnh sáng theo ánh sáng & chuyển động'
-                              : 'Bật để tự động điều chỉnh',
+                              ? 'Tự động chỉnh độ sáng & bật khi có người'
+                              : 'Đang tắt tự động (chế độ điều khiển thủ công)',
                           style: const TextStyle(
                             color: AppTheme.textSecondary,
                             fontSize: 12,
@@ -132,164 +123,175 @@ class SensorScreen extends StatelessWidget {
                       ],
                     ),
                   ),
-                  Switch(
-                    value: led.autoMode,
-                    onChanged: (v) => led.setAutoMode(v),
-                    activeColor: AppTheme.accentGreen,
+                  Transform.scale(
+                    scale: 1.15,
+                    child: Switch(
+                      value: led.autoMode,
+                      onChanged: (v) => led.setAutoMode(v),
+                      activeThumbColor: AppTheme.accentGreen,
+                      activeTrackColor:
+                          AppTheme.accentGreen.withValues(alpha: 0.35),
+                    ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 22),
 
-            // Light intensity chart
-            Text(
-              'Biểu đồ cường độ ánh sáng',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+            // Light intensity chart header
+            const Text(
+              'Biểu Đồ Cường Độ Ánh Sáng (Lux)',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: AppTheme.textPrimary,
+              ),
             ),
             const SizedBox(height: 12),
-            Container(
-              height: 200,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppTheme.cardDark,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.borderDark),
-              ),
-              child: history.isEmpty
-                  ? const Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.show_chart_rounded,
-                            color: AppTheme.textTertiary,
-                            size: 40,
-                          ),
-                          SizedBox(height: 8),
-                          Text(
-                            'Chưa có dữ liệu\nKết nối ESP32 để nhận dữ liệu',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
+
+            // 3D Liquid Glass Chart Container
+            LiquidGlassCard(
+              borderRadius: 24,
+              padding: const EdgeInsets.all(20),
+              child: SizedBox(
+                height: 210,
+                child: history.isEmpty
+                    ? const Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.show_chart_rounded,
                               color: AppTheme.textTertiary,
-                              fontSize: 13,
+                              size: 44,
+                            ),
+                            SizedBox(height: 10),
+                            Text(
+                              'Đang chờ dữ liệu cảm biến từ ESP32...\nHãy kiểm tra kết nối MQTT trong phần Cài đặt',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: AppTheme.textTertiary,
+                                fontSize: 13,
+                                height: 1.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : LineChart(
+                        LineChartData(
+                          gridData: FlGridData(
+                            show: true,
+                            drawVerticalLine: false,
+                            horizontalInterval: 200,
+                            getDrawingHorizontalLine: (value) => FlLine(
+                              color: Colors.white.withValues(alpha: 0.08),
+                              strokeWidth: 1,
                             ),
                           ),
-                        ],
-                      ),
-                    )
-                  : LineChart(
-                      LineChartData(
-                        gridData: FlGridData(
-                          show: true,
-                          drawVerticalLine: false,
-                          horizontalInterval: 200,
-                          getDrawingHorizontalLine: (value) => FlLine(
-                            color: AppTheme.borderDark,
-                            strokeWidth: 0.5,
-                          ),
-                        ),
-                        titlesData: FlTitlesData(
-                          topTitles: const AxisTitles(
-                            sideTitles: SideTitles(showTitles: false),
-                          ),
-                          rightTitles: const AxisTitles(
-                            sideTitles: SideTitles(showTitles: false),
-                          ),
-                          bottomTitles: const AxisTitles(
-                            sideTitles: SideTitles(showTitles: false),
-                          ),
-                          leftTitles: AxisTitles(
-                            sideTitles: SideTitles(
-                              showTitles: true,
-                              reservedSize: 40,
-                              getTitlesWidget: (value, meta) {
-                                return Text(
-                                  '${value.toInt()}',
-                                  style: const TextStyle(
-                                    color: AppTheme.textTertiary,
-                                    fontSize: 10,
-                                  ),
-                                );
-                              },
+                          titlesData: FlTitlesData(
+                            topTitles: const AxisTitles(
+                              sideTitles: SideTitles(showTitles: false),
                             ),
-                          ),
-                        ),
-                        borderData: FlBorderData(show: false),
-                        lineBarsData: [
-                          LineChartBarData(
-                            spots: history
-                                .asMap()
-                                .entries
-                                .map((e) => FlSpot(
-                                      e.key.toDouble(),
-                                      e.value.lightIntensity,
-                                    ))
-                                .toList(),
-                            isCurved: true,
-                            gradient: AppTheme.warmGradient,
-                            barWidth: 2,
-                            dotData: const FlDotData(show: false),
-                            belowBarData: BarAreaData(
-                              show: true,
-                              gradient: LinearGradient(
-                                colors: [
-                                  AppTheme.accentOrange.withOpacity(0.2),
-                                  AppTheme.accentOrange.withOpacity(0.0),
-                                ],
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
+                            rightTitles: const AxisTitles(
+                              sideTitles: SideTitles(showTitles: false),
+                            ),
+                            bottomTitles: const AxisTitles(
+                              sideTitles: SideTitles(showTitles: false),
+                            ),
+                            leftTitles: AxisTitles(
+                              sideTitles: SideTitles(
+                                showTitles: true,
+                                reservedSize: 42,
+                                getTitlesWidget: (value, meta) {
+                                  return Text(
+                                    '${value.toInt()}',
+                                    style: const TextStyle(
+                                      color: AppTheme.textTertiary,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  );
+                                },
                               ),
                             ),
                           ),
-                        ],
+                          borderData: FlBorderData(show: false),
+                          lineBarsData: [
+                            LineChartBarData(
+                              spots: history
+                                  .asMap()
+                                  .entries
+                                  .map((e) => FlSpot(
+                                        e.key.toDouble(),
+                                        e.value.lightIntensity,
+                                      ))
+                                  .toList(),
+                              isCurved: true,
+                              curveSmoothness: 0.35,
+                              gradient: AppTheme.sunsetGradient,
+                              barWidth: 3,
+                              dotData: const FlDotData(show: false),
+                              belowBarData: BarAreaData(
+                                show: true,
+                                gradient: LinearGradient(
+                                  colors: [
+                                    AppTheme.accentOrange.withValues(alpha: 0.3),
+                                    AppTheme.accentPink.withValues(alpha: 0.0),
+                                  ],
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-            ),
-            const SizedBox(height: 24),
-
-            // How it works
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: AppTheme.cardDark,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.borderDark),
               ),
-              child: Column(
+            ),
+            const SizedBox(height: 22),
+
+            // How it works info card (3D Liquid Glass)
+            LiquidGlassCard(
+              borderRadius: 24,
+              padding: const EdgeInsets.all(20),
+              child: const Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Row(
+                  Row(
                     children: [
-                      Icon(Icons.info_outline_rounded, size: 18, color: AppTheme.accentBlue),
+                      Icon(
+                        Icons.info_outline_rounded,
+                        size: 20,
+                        color: AppTheme.accentCyan,
+                      ),
                       SizedBox(width: 8),
                       Text(
-                        'Cách hoạt động',
+                        'Cơ Chế Hoạt Động Cảm Biến',
                         style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.accentBlue,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: AppTheme.accentCyan,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: 14),
                   _InfoRow(
                     icon: Icons.wb_sunny_outlined,
-                    text: 'Cảm biến ánh sáng đo cường độ ánh sáng (lux)',
+                    text: 'Cảm biến BH1750 đo liên tục ánh sáng môi trường thực tế.',
                   ),
                   _InfoRow(
                     icon: Icons.directions_walk_outlined,
-                    text: 'Cảm biến PIR phát hiện chuyển động',
+                    text: 'Cảm biến hồng ngoại PIR phát hiện chuyển động trong phạm vi 5 mét.',
                   ),
                   _InfoRow(
                     icon: Icons.auto_mode_outlined,
-                    text: 'Chế độ tự động: Điều chỉnh sáng theo môi trường',
+                    text: 'Chế độ Auto tự điều chỉnh độ sáng WS2812 chống mỏi mắt.',
                   ),
                   _InfoRow(
                     icon: Icons.lightbulb_outline,
-                    text: 'Tự bật đèn khi phát hiện chuyển động (tự động)',
+                    text: 'Tự động thắp sáng khi bước vào phòng và tắt khi không có người.',
                   ),
                 ],
               ),
@@ -301,65 +303,69 @@ class SensorScreen extends StatelessWidget {
   }
 }
 
-class _SensorInfoCard extends StatelessWidget {
+class _SensorCard3D extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
   final String status;
-  final Color color;
-  final LinearGradient gradient;
+  final Color accentColor;
 
-  const _SensorInfoCard({
+  const _SensorCard3D({
     required this.icon,
     required this.label,
     required this.value,
     required this.status,
-    required this.color,
-    required this.gradient,
+    required this.accentColor,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: gradient.colors
-              .map((c) => c.withOpacity(0.1))
-              .toList(),
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.2)),
-      ),
+    return LiquidGlassCard(
+      borderRadius: 22,
+      padding: const EdgeInsets.all(18),
+      tintColor: accentColor,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: accentColor.withValues(alpha: 0.20),
+              border: Border.all(
+                color: accentColor.withValues(alpha: 0.45),
+              ),
+            ),
+            child: Icon(icon, color: accentColor, size: 22),
+          ),
+          const SizedBox(height: 14),
           Text(
             label,
             style: const TextStyle(
               color: AppTheme.textSecondary,
               fontSize: 12,
+              fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             value,
             style: TextStyle(
-              color: color,
+              color: accentColor,
               fontSize: 20,
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.3,
             ),
           ),
           const SizedBox(height: 2),
           Text(
             status,
-            style: TextStyle(
-              color: color.withOpacity(0.7),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: AppTheme.textTertiary,
               fontSize: 11,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],
@@ -377,19 +383,19 @@ class _InfoRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 10),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 16, color: AppTheme.textSecondary),
-          const SizedBox(width: 8),
+          Icon(icon, size: 16, color: AppTheme.accentCyan),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(
               text,
               style: const TextStyle(
+                fontSize: 12.5,
                 color: AppTheme.textSecondary,
-                fontSize: 13,
-                height: 1.3,
+                height: 1.4,
               ),
             ),
           ),

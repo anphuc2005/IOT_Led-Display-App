@@ -1,9 +1,11 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/led_provider.dart';
 import '../services/mqtt_service.dart';
 import '../theme/app_theme.dart';
 import '../models/led_state.dart';
+import '../widgets/liquid_glass.dart';
 import 'color_picker_screen.dart';
 import 'effects_screen.dart';
 import 'ai_chat_screen.dart';
@@ -19,73 +21,154 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   int _currentIndex = 0;
-  late AnimationController _pulseController;
-  late Animation<double> _pulseAnimation;
 
-  final List<Widget> _screens = const [
-    _DashboardView(),
-    ColorPickerScreen(),
-    EffectsScreen(),
-    AiChatScreen(),
-    SensorScreen(),
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-    _pulseController = AnimationController(
-      duration: const Duration(seconds: 2),
-      vsync: this,
-    )..repeat(reverse: true);
-    _pulseAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
-    );
-  }
-
-  @override
-  void dispose() {
-    _pulseController.dispose();
-    super.dispose();
+  void _onSelectTab(int index) {
+    setState(() => _currentIndex = index);
   }
 
   @override
   Widget build(BuildContext context) {
+    final screens = [
+      _DashboardView(onSelectTab: _onSelectTab),
+      const ColorPickerScreen(),
+      const EffectsScreen(),
+      const AiChatScreen(),
+      const SensorScreen(),
+    ];
+
     return Scaffold(
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 300),
-        child: _screens[_currentIndex],
+      extendBody: true,
+      backgroundColor: Colors.transparent,
+      body: LiquidBackground(
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 250),
+          child: screens[_currentIndex],
+        ),
       ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: AppTheme.surfaceDark,
-          border: Border(
-            top: BorderSide(color: AppTheme.borderDark.withOpacity(0.5)),
+      bottomNavigationBar: _LiquidFloatingNavBar(
+        currentIndex: _currentIndex,
+        onTap: _onSelectTab,
+      ),
+    );
+  }
+}
+
+/// Floating Capsule Liquid Glass 3D Navigation Bar
+class _LiquidFloatingNavBar extends StatelessWidget {
+  final int currentIndex;
+  final ValueChanged<int> onTap;
+
+  const _LiquidFloatingNavBar({
+    required this.currentIndex,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(34),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+            child: Container(
+              height: 66,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(34),
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0x38FFFFFF),
+                    Color(0x10FFFFFF),
+                  ],
+                ),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.28),
+                  width: 1.2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.45),
+                    blurRadius: 28,
+                    spreadRadius: -2,
+                    offset: const Offset(0, 12),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _navItem(0, Icons.dashboard_rounded, 'Trang chủ'),
+                  _navItem(1, Icons.palette_rounded, 'Màu sắc'),
+                  _navItem(2, Icons.auto_awesome_rounded, 'Hiệu ứng'),
+                  _navItem(3, Icons.smart_toy_rounded, 'AI Voice'),
+                  _navItem(4, Icons.sensors_rounded, 'Cảm biến'),
+                ],
+              ),
+            ),
           ),
         ),
-        child: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          onTap: (i) => setState(() => _currentIndex = i),
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.dashboard_rounded),
-              label: 'Trang chủ',
+      ),
+    );
+  }
+
+  Widget _navItem(int index, IconData icon, String label) {
+    final isSelected = currentIndex == index;
+    return GestureDetector(
+      onTap: () => onTap(index),
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        padding: EdgeInsets.symmetric(
+          horizontal: isSelected ? 14 : 10,
+          vertical: 8,
+        ),
+        decoration: isSelected
+            ? BoxDecoration(
+                borderRadius: BorderRadius.circular(24),
+                gradient: LinearGradient(
+                  colors: [
+                    AppTheme.accentCyan.withValues(alpha: 0.35),
+                    AppTheme.accentBlue.withValues(alpha: 0.18),
+                  ],
+                ),
+                border: Border.all(
+                  color: AppTheme.accentCyan.withValues(alpha: 0.65),
+                  width: 1.1,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.accentCyan.withValues(alpha: 0.30),
+                    blurRadius: 14,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              )
+            : null,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 21,
+              color: isSelected ? AppTheme.accentCyan : AppTheme.textSecondary,
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.palette_rounded),
-              label: 'Màu sắc',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.auto_awesome_rounded),
-              label: 'Hiệu ứng',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.smart_toy_rounded),
-              label: 'AI',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.sensors_rounded),
-              label: 'Cảm biến',
-            ),
+            if (isSelected) ...[
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: AppTheme.textPrimary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.2,
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -94,7 +177,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 }
 
 class _DashboardView extends StatelessWidget {
-  const _DashboardView();
+  final ValueChanged<int> onSelectTab;
+
+  const _DashboardView({required this.onSelectTab});
 
   @override
   Widget build(BuildContext context) {
@@ -103,30 +188,30 @@ class _DashboardView extends StatelessWidget {
     final state = led.ledState;
 
     return SafeArea(
+      bottom: false,
       child: CustomScrollView(
         slivers: [
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Header
+                  // Top Bar
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'Smart LED',
-                            style: Theme.of(context)
-                                .textTheme
-                                .headlineMedium
-                                ?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.textPrimary,
-                                ),
+                          const Text(
+                            'Smart LED Pro',
+                            style: TextStyle(
+                              fontSize: 26,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.5,
+                              color: AppTheme.textPrimary,
+                            ),
                           ),
                           const SizedBox(height: 4),
                           Row(
@@ -136,82 +221,118 @@ class _DashboardView extends StatelessWidget {
                                 height: 8,
                                 decoration: BoxDecoration(
                                   color: mqtt.isConnected
-                                      ? AppTheme.accentGreen
+                                      ? AppTheme.accentCyan
                                       : AppTheme.accentRed,
                                   shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: (mqtt.isConnected
+                                              ? AppTheme.accentCyan
+                                              : AppTheme.accentRed)
+                                          .withValues(alpha: 0.6),
+                                      blurRadius: 6,
+                                      spreadRadius: 1,
+                                    ),
+                                  ],
                                 ),
                               ),
                               const SizedBox(width: 8),
                               Text(
                                 mqtt.isConnected
-                                    ? 'Đã kết nối'
-                                    : 'Chưa kết nối',
+                                    ? 'ESP32 Online • MQTT Sẵn sàng'
+                                    : 'Chưa kết nối MQTT',
                                 style: TextStyle(
                                   color: mqtt.isConnected
-                                      ? AppTheme.accentGreen
+                                      ? AppTheme.accentCyan
                                       : AppTheme.textSecondary,
-                                  fontSize: 14,
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ],
                           ),
                         ],
                       ),
-                      IconButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const SettingsScreen(),
+                      // Settings Liquid Glass Button
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(16),
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const SettingsScreen(),
+                                ),
+                              );
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.22),
+                                ),
+                              ),
+                              child: const Icon(
+                                Icons.settings_rounded,
+                                color: AppTheme.textPrimary,
+                                size: 22,
+                              ),
                             ),
-                          );
-                        },
-                        icon: const Icon(Icons.settings_rounded),
-                        style: IconButton.styleFrom(
-                          backgroundColor: AppTheme.cardDark,
-                          padding: const EdgeInsets.all(12),
+                          ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 22),
 
-                  // Power switch card
-                  _GlassCard(
-                    gradient: state.isOn
-                        ? LinearGradient(
-                            colors: [
-                              Color.fromRGBO(
-                                state.color.red,
-                                state.color.green,
-                                state.color.blue,
-                                0.3,
-                              ),
-                              Color.fromRGBO(
-                                state.color.red,
-                                state.color.green,
-                                state.color.blue,
-                                0.1,
-                              ),
-                            ],
-                          )
-                        : null,
+                  // 3D Liquid Glass Power Switch Card
+                  LiquidGlassCard(
+                    tintColor: state.isOn ? state.color : null,
+                    borderRadius: 24,
+                    padding: const EdgeInsets.all(20),
                     child: Row(
                       children: [
+                        // Dynamic 3D Glowing Bulb Disc
                         Container(
-                          width: 60,
-                          height: 60,
+                          width: 62,
+                          height: 62,
                           decoration: BoxDecoration(
+                            shape: BoxShape.circle,
                             gradient: state.isOn
                                 ? LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
                                     colors: [
-                                      state.color.withOpacity(0.8),
-                                      state.color.withOpacity(0.4),
+                                      state.color,
+                                      state.color.withValues(alpha: 0.6),
                                     ],
                                   )
+                                : LinearGradient(
+                                    colors: [
+                                      Colors.white.withValues(alpha: 0.12),
+                                      Colors.white.withValues(alpha: 0.04),
+                                    ],
+                                  ),
+                            boxShadow: state.isOn
+                                ? [
+                                    BoxShadow(
+                                      color: state.color.withValues(alpha: 0.55),
+                                      blurRadius: 22,
+                                      spreadRadius: 2,
+                                    ),
+                                  ]
                                 : null,
-                            color: state.isOn ? null : AppTheme.cardDark,
-                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: state.isOn
+                                  ? Colors.white.withValues(alpha: 0.6)
+                                  : Colors.white.withValues(alpha: 0.15),
+                              width: 1.5,
+                            ),
                           ),
                           child: Icon(
                             state.isOn
@@ -220,40 +341,42 @@ class _DashboardView extends StatelessWidget {
                             color: state.isOn
                                 ? Colors.white
                                 : AppTheme.textSecondary,
-                            size: 30,
+                            size: 32,
                           ),
                         ),
-                        const SizedBox(width: 16),
+                        const SizedBox(width: 18),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                state.isOn ? 'Đèn đang bật' : 'Đèn đang tắt',
+                                state.isOn ? 'Đèn đang BẬT' : 'Đèn đang TẮT',
                                 style: const TextStyle(
                                   fontSize: 18,
-                                  fontWeight: FontWeight.w600,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppTheme.textPrimary,
                                 ),
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                'Độ sáng: ${state.brightness}% • ${state.effect.displayName}',
+                                'Độ sáng ${state.brightness}% • ${state.effect.displayName}',
                                 style: const TextStyle(
                                   color: AppTheme.textSecondary,
                                   fontSize: 13,
+                                  fontWeight: FontWeight.w500,
                                 ),
                               ),
                             ],
                           ),
                         ),
                         Transform.scale(
-                          scale: 1.2,
+                          scale: 1.15,
                           child: Switch(
                             value: state.isOn,
                             onChanged: (v) => led.togglePower(v),
-                            activeColor: AppTheme.accentBlue,
+                            activeThumbColor: AppTheme.accentCyan,
                             activeTrackColor:
-                                AppTheme.accentBlue.withOpacity(0.3),
+                                AppTheme.accentCyan.withValues(alpha: 0.35),
                           ),
                         ),
                       ],
@@ -261,8 +384,10 @@ class _DashboardView extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
 
-                  // Brightness slider
-                  _GlassCard(
+                  // 3D Liquid Glass Brightness Card
+                  LiquidGlassCard(
+                    borderRadius: 24,
+                    padding: const EdgeInsets.all(20),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -271,13 +396,18 @@ class _DashboardView extends StatelessWidget {
                           children: [
                             const Row(
                               children: [
-                                Icon(Icons.brightness_6_rounded, size: 20),
+                                Icon(
+                                  Icons.brightness_6_rounded,
+                                  size: 20,
+                                  color: AppTheme.accentCyan,
+                                ),
                                 SizedBox(width: 8),
                                 Text(
-                                  'Độ sáng',
+                                  'Độ Sáng Dải LED',
                                   style: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 15,
+                                    color: AppTheme.textPrimary,
                                   ),
                                 ),
                               ],
@@ -288,29 +418,35 @@ class _DashboardView extends StatelessWidget {
                                 vertical: 4,
                               ),
                               decoration: BoxDecoration(
-                                color: AppTheme.accentBlue.withOpacity(0.1),
+                                color: AppTheme.accentCyan.withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: AppTheme.accentCyan.withValues(alpha: 0.35),
+                                ),
                               ),
                               child: Text(
                                 '${state.brightness}%',
                                 style: const TextStyle(
-                                  color: AppTheme.accentBlue,
-                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.accentCyan,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 13,
                                 ),
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 14),
                         SliderTheme(
                           data: SliderThemeData(
-                            activeTrackColor: AppTheme.accentBlue,
-                            inactiveTrackColor:
-                                AppTheme.accentBlue.withOpacity(0.15),
+                            activeTrackColor: AppTheme.accentCyan,
+                            inactiveTrackColor: Colors.white.withValues(alpha: 0.12),
                             thumbColor: Colors.white,
-                            overlayColor:
-                                AppTheme.accentBlue.withOpacity(0.15),
-                            trackHeight: 6,
+                            overlayColor: AppTheme.accentCyan.withValues(alpha: 0.2),
+                            trackHeight: 7,
+                            thumbShape: const RoundSliderThumbShape(
+                              enabledThumbRadius: 10,
+                              elevation: 4,
+                            ),
                           ),
                           child: Slider(
                             value: state.brightness.toDouble(),
@@ -322,129 +458,122 @@ class _DashboardView extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 22),
 
-                  // Quick actions grid
-                  Text(
-                    'Thao tác nhanh',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                  // Quick actions label
+                  const Text(
+                    'Điều Khiển Nhanh',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textPrimary,
+                    ),
                   ),
                   const SizedBox(height: 12),
+
+                  // 3D Glass Quick Action Grid
                   GridView.count(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     crossAxisCount: 2,
                     mainAxisSpacing: 12,
                     crossAxisSpacing: 12,
-                    childAspectRatio: 1.6,
+                    childAspectRatio: 1.55,
                     children: [
-                      _QuickActionCard(
+                      _ActionCard3D(
                         icon: Icons.palette_rounded,
-                        label: 'Chọn màu',
-                        gradient: AppTheme.primaryGradient,
-                        onTap: () {
-                          // Navigate handled by bottom nav
-                        },
+                        label: 'Chọn màu sắc',
+                        glowColor: AppTheme.accentPurple,
+                        onTap: () => onSelectTab(1),
                       ),
-                      _QuickActionCard(
+                      _ActionCard3D(
                         icon: Icons.auto_awesome_rounded,
-                        label: 'Hiệu ứng',
-                        gradient: AppTheme.cyanGradient,
-                        onTap: () {},
+                        label: 'Hiệu ứng ánh sáng',
+                        glowColor: AppTheme.accentCyan,
+                        onTap: () => onSelectTab(2),
                       ),
-                      _QuickActionCard(
+                      _ActionCard3D(
                         icon: led.autoMode
                             ? Icons.autorenew_rounded
                             : Icons.autorenew_outlined,
-                        label: led.autoMode ? 'Tự động: BẬT' : 'Tự động: TẮT',
-                        gradient: led.autoMode
-                            ? const LinearGradient(
-                                colors: [
-                                  AppTheme.accentGreen,
-                                  Color(0xFF00B4D8)
-                                ],
-                              )
-                            : const LinearGradient(
-                                colors: [
-                                  AppTheme.textTertiary,
-                                  AppTheme.textSecondary
-                                ],
-                              ),
+                        label: led.autoMode ? 'Cảm biến: BẬT' : 'Cảm biến: TẮT',
+                        glowColor: led.autoMode
+                            ? AppTheme.accentGreen
+                            : AppTheme.textSecondary,
                         onTap: () => led.setAutoMode(!led.autoMode),
                       ),
-                      _QuickActionCard(
+                      _ActionCard3D(
                         icon: Icons.sensors_rounded,
                         label:
                             '${led.sensorData.lightIntensity.toStringAsFixed(0)} lux',
-                        gradient: AppTheme.warmGradient,
-                        onTap: () {},
+                        glowColor: AppTheme.accentOrange,
+                        onTap: () => onSelectTab(4),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 22),
 
                   // Preset colors
-                  Text(
-                    'Màu nhanh',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                  const Text(
+                    'Màu Sắc Nhanh',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textPrimary,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   SizedBox(
-                    height: 64,
+                    height: 68,
                     child: ListView(
                       scrollDirection: Axis.horizontal,
                       children: [
-                        _PresetColorButton(
-                          color: Colors.red,
+                        _GemstoneColor3D(
+                          color: const Color(0xFFFF2D55),
                           label: 'Đỏ',
-                          onTap: () => led.setColor(Colors.red),
+                          onTap: () => led.setColor(const Color(0xFFFF2D55)),
                         ),
-                        _PresetColorButton(
-                          color: Colors.green,
-                          label: 'Xanh lá',
-                          onTap: () => led.setColor(Colors.green),
-                        ),
-                        _PresetColorButton(
-                          color: Colors.blue,
-                          label: 'Xanh dương',
-                          onTap: () => led.setColor(Colors.blue),
-                        ),
-                        _PresetColorButton(
-                          color: Colors.yellow,
-                          label: 'Vàng',
-                          onTap: () => led.setColor(Colors.yellow),
-                        ),
-                        _PresetColorButton(
-                          color: Colors.purple,
-                          label: 'Tím',
-                          onTap: () => led.setColor(Colors.purple),
-                        ),
-                        _PresetColorButton(
-                          color: Colors.orange,
-                          label: 'Cam',
-                          onTap: () => led.setColor(Colors.orange),
-                        ),
-                        _PresetColorButton(
-                          color: Colors.pink,
-                          label: 'Hồng',
-                          onTap: () => led.setColor(Colors.pink),
-                        ),
-                        _PresetColorButton(
-                          color: Colors.cyan,
+                        _GemstoneColor3D(
+                          color: const Color(0xFF00F5D4),
                           label: 'Cyan',
-                          onTap: () => led.setColor(Colors.cyan),
+                          onTap: () => led.setColor(const Color(0xFF00F5D4)),
                         ),
-                        _PresetColorButton(
-                          color: const Color(0xFFFFB464),
+                        _GemstoneColor3D(
+                          color: const Color(0xFF10B981),
+                          label: 'Xanh lá',
+                          onTap: () => led.setColor(const Color(0xFF10B981)),
+                        ),
+                        _GemstoneColor3D(
+                          color: const Color(0xFF38BDF8),
+                          label: 'Xanh lam',
+                          onTap: () => led.setColor(const Color(0xFF38BDF8)),
+                        ),
+                        _GemstoneColor3D(
+                          color: const Color(0xFFFFB703),
+                          label: 'Vàng',
+                          onTap: () => led.setColor(const Color(0xFFFFB703)),
+                        ),
+                        _GemstoneColor3D(
+                          color: const Color(0xFFA855F7),
+                          label: 'Tím',
+                          onTap: () => led.setColor(const Color(0xFFA855F7)),
+                        ),
+                        _GemstoneColor3D(
+                          color: const Color(0xFFFF8500),
+                          label: 'Cam',
+                          onTap: () => led.setColor(const Color(0xFFFF8500)),
+                        ),
+                        _GemstoneColor3D(
+                          color: const Color(0xFFFF007A),
+                          label: 'Hồng',
+                          onTap: () => led.setColor(const Color(0xFFFF007A)),
+                        ),
+                        _GemstoneColor3D(
+                          color: const Color(0xFFFFD166),
                           label: 'Ấm',
-                          onTap: () =>
-                              led.setColor(const Color(0xFFFFB464)),
+                          onTap: () => led.setColor(const Color(0xFFFFD166)),
                         ),
-                        _PresetColorButton(
+                        _GemstoneColor3D(
                           color: Colors.white,
                           label: 'Trắng',
                           onTap: () => led.setColor(Colors.white),
@@ -462,89 +591,67 @@ class _DashboardView extends StatelessWidget {
   }
 }
 
-class _GlassCard extends StatelessWidget {
-  final Widget child;
-  final LinearGradient? gradient;
-
-  const _GlassCard({required this.child, this.gradient});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: gradient,
-        color: gradient == null ? AppTheme.cardDark : null,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: AppTheme.borderDark.withOpacity(0.5),
-        ),
-      ),
-      child: child,
-    );
-  }
-}
-
-class _QuickActionCard extends StatelessWidget {
+/// 3D Liquid Glass Quick Action Card
+class _ActionCard3D extends StatelessWidget {
   final IconData icon;
   final String label;
-  final LinearGradient gradient;
+  final Color glowColor;
   final VoidCallback onTap;
 
-  const _QuickActionCard({
+  const _ActionCard3D({
     required this.icon,
     required this.label,
-    required this.gradient,
+    required this.glowColor,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return LiquidGlassCard(
+      borderRadius: 20,
+      padding: const EdgeInsets.all(16),
+      tintColor: glowColor,
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: gradient.colors
-                .map((c) => c.withOpacity(0.15))
-                .toList(),
-          ),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: gradient.colors.first.withOpacity(0.3),
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Icon(
-              icon,
-              color: gradient.colors.first,
-              size: 28,
-            ),
-            Text(
-              label,
-              style: TextStyle(
-                color: gradient.colors.first,
-                fontWeight: FontWeight.w600,
-                fontSize: 13,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: glowColor.withValues(alpha: 0.2),
+              border: Border.all(
+                color: glowColor.withValues(alpha: 0.4),
               ),
             ),
-          ],
-        ),
+            child: Icon(
+              icon,
+              color: glowColor,
+              size: 22,
+            ),
+          ),
+          Text(
+            label,
+            style: const TextStyle(
+              color: AppTheme.textPrimary,
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _PresetColorButton extends StatelessWidget {
+/// 3D Gemstone Color Preset Sphere
+class _GemstoneColor3D extends StatelessWidget {
   final Color color;
   final String label;
   final VoidCallback onTap;
 
-  const _PresetColorButton({
+  const _GemstoneColor3D({
     required this.color,
     required this.label,
     required this.onTap,
@@ -555,33 +662,44 @@ class _PresetColorButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: const EdgeInsets.only(right: 12),
+        margin: const EdgeInsets.only(right: 14),
         child: Column(
           children: [
             Container(
-              width: 40,
-              height: 40,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
-                color: color,
                 shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  center: const Alignment(-0.35, -0.45),
+                  radius: 0.9,
+                  colors: [
+                    Colors.white.withValues(alpha: 0.8),
+                    color,
+                    color.withValues(alpha: 0.8),
+                  ],
+                  stops: const [0.0, 0.4, 1.0],
+                ),
                 border: Border.all(
-                  color: Colors.white.withOpacity(0.3),
-                  width: 2,
+                  color: Colors.white.withValues(alpha: 0.4),
+                  width: 1.5,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: color.withOpacity(0.4),
-                    blurRadius: 8,
+                    color: color.withValues(alpha: 0.5),
+                    blurRadius: 12,
                     spreadRadius: 1,
+                    offset: const Offset(0, 4),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 5),
             Text(
               label,
               style: const TextStyle(
-                fontSize: 10,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
                 color: AppTheme.textSecondary,
               ),
             ),

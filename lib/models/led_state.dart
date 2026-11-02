@@ -74,6 +74,27 @@ extension LedEffectExt on LedEffect {
         return 'chase';
     }
   }
+
+  String get description {
+    switch (this) {
+      case LedEffect.none:
+        return 'Tắt hiệu ứng, giữ màu tĩnh';
+      case LedEffect.blink:
+        return 'Nhấp nháy bật tắt tuần hoàn';
+      case LedEffect.fade:
+        return 'Mờ dần và sáng dần êm dịu';
+      case LedEffect.rainbow:
+        return 'Chuyển dải 7 sắc cầu vồng sinh động';
+      case LedEffect.breathing:
+        return 'Hiệu ứng nhịp thở thư giãn';
+      case LedEffect.strobe:
+        return 'Chớp nháy nhanh sôi động';
+      case LedEffect.colorWipe:
+        return 'Quét màu lần lượt qua từng bóng';
+      case LedEffect.chase:
+        return 'Hiệu ứng đuổi màu chạy dọc dải';
+    }
+  }
 }
 
 class LedState {

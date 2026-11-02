@@ -8,6 +8,7 @@ import '../services/wyoming_stt_service.dart';
 import '../services/vieneu_tts_service.dart';
 import '../providers/led_provider.dart';
 import '../theme/app_theme.dart';
+import '../widgets/liquid_glass.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -92,8 +93,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           content: const Text('Vui lòng nhập địa chỉ IP/Host máy chủ Wyoming.'),
           backgroundColor: AppTheme.accentOrange,
           behavior: SnackBarBehavior.floating,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       );
       return;
@@ -129,8 +129,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           content: const Text('Vui lòng nhập địa chỉ máy chủ VieNeu-TTS.'),
           backgroundColor: AppTheme.accentOrange,
           behavior: SnackBarBehavior.floating,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       );
       return;
@@ -246,498 +245,585 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     final mqtt = context.watch<MqttService>();
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Cài đặt'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded),
-          onPressed: () => Navigator.pop(context),
+    return LiquidBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          title: const Text(
+            'Cài Đặt Hệ Thống',
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: 20,
+              letterSpacing: -0.3,
+            ),
+          ),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new_rounded),
+            onPressed: () => Navigator.pop(context),
+          ),
         ),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Connection status
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: mqtt.isConnected
-                    ? AppTheme.accentGreen.withOpacity(0.1)
-                    : AppTheme.accentRed.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: mqtt.isConnected
-                      ? AppTheme.accentGreen.withOpacity(0.3)
-                      : AppTheme.accentRed.withOpacity(0.3),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    mqtt.isConnected
-                        ? Icons.wifi_rounded
-                        : Icons.wifi_off_rounded,
-                    color: mqtt.isConnected
-                        ? AppTheme.accentGreen
-                        : AppTheme.accentRed,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          mqtt.isConnected
-                              ? 'Đã kết nối MQTT'
-                              : 'Chưa kết nối MQTT',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            color: mqtt.isConnected
-                                ? AppTheme.accentGreen
-                                : AppTheme.accentRed,
-                          ),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 40),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 3D Liquid Glass Connection status banner
+              LiquidGlassCard(
+                borderRadius: 18,
+                tintColor: mqtt.isConnected ? AppTheme.accentGreen : AppTheme.accentRed,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: (mqtt.isConnected ? AppTheme.accentGreen : AppTheme.accentRed)
+                            .withValues(alpha: 0.18),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: (mqtt.isConnected ? AppTheme.accentGreen : AppTheme.accentRed)
+                              .withValues(alpha: 0.4),
                         ),
-                        if (mqtt.errorMessage.isNotEmpty)
-                          Text(
-                            mqtt.errorMessage,
-                            style: const TextStyle(
-                              color: AppTheme.textSecondary,
-                              fontSize: 12,
-                            ),
-                          ),
-                      ],
+                      ),
+                      child: Icon(
+                        mqtt.isConnected
+                            ? Icons.wifi_rounded
+                            : Icons.wifi_off_rounded,
+                        color: mqtt.isConnected
+                            ? AppTheme.accentGreen
+                            : AppTheme.accentRed,
+                        size: 20,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // MQTT Settings
-            _SectionHeader(
-              icon: Icons.router_rounded,
-              title: 'MQTT Broker',
-            ),
-            const SizedBox(height: 12),
-            _buildTextField(
-              controller: _brokerController,
-              label: 'Địa chỉ broker',
-              hint: 'test.mosquitto.org',
-              icon: Icons.dns_rounded,
-            ),
-            const SizedBox(height: 12),
-            _buildTextField(
-              controller: _portController,
-              label: 'Port',
-              hint: '1883',
-              icon: Icons.numbers_rounded,
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: 12),
-            _buildTextField(
-              controller: _usernameController,
-              label: 'Username (tùy chọn)',
-              hint: '',
-              icon: Icons.person_rounded,
-            ),
-            const SizedBox(height: 12),
-            _buildTextField(
-              controller: _passwordController,
-              label: 'Password (tùy chọn)',
-              hint: '',
-              icon: Icons.lock_rounded,
-              obscureText: _obscurePassword,
-              suffixIcon: IconButton(
-                icon: Icon(
-                  _obscurePassword
-                      ? Icons.visibility_rounded
-                      : Icons.visibility_off_rounded,
-                  color: AppTheme.textSecondary,
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            mqtt.isConnected
+                                ? 'Đã kết nối MQTT Broker'
+                                : 'Chưa kết nối MQTT',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15,
+                              color: mqtt.isConnected
+                                  ? AppTheme.accentGreen
+                                  : AppTheme.accentRed,
+                            ),
+                          ),
+                          if (mqtt.errorMessage.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Text(
+                                mqtt.errorMessage,
+                                style: const TextStyle(
+                                  color: AppTheme.textSecondary,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                onPressed: () =>
-                    setState(() => _obscurePassword = !_obscurePassword),
               ),
-            ),
-            const SizedBox(height: 12),
-            _buildTextField(
-              controller: _topicPrefixController,
-              label: 'Topic prefix',
-              hint: 'smart_led',
-              icon: Icons.topic_rounded,
-            ),
-            const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
-            // Wyoming Vietnamese Speech-to-Text Section
-            _SectionHeader(
-              icon: Icons.mic_external_on_rounded,
-              title: 'Wyoming Vietnamese STT (luuquangvu)',
-            ),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: AppTheme.cardDark,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.borderDark),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Nhận diện giọng nói qua Wyoming',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 14,
-                              ),
-                            ),
-                            SizedBox(height: 3),
-                            Text(
-                              'Dùng model Zipformer tiếng Việt chuyên dụng, kháng ồn tốt, nhận diện giọng 3 miền Bắc/Trung/Nam.',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: AppTheme.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Switch(
-                        value: _wyomingEnabled,
-                        activeColor: AppTheme.accentCyan,
-                        onChanged: (v) => setState(() => _wyomingEnabled = v),
-                      ),
-                    ],
-                  ),
-                  if (_wyomingEnabled) ...[
-                    const Divider(color: AppTheme.borderDark, height: 20),
+              // MQTT Settings Card
+              LiquidGlassCard(
+                borderRadius: 22,
+                tintColor: AppTheme.accentBlue,
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const _SectionHeader(
+                      icon: Icons.router_rounded,
+                      title: 'MQTT Broker',
+                      color: AppTheme.accentBlue,
+                    ),
+                    const SizedBox(height: 16),
                     _buildTextField(
-                      controller: _wyomingHostController,
-                      label: 'Địa chỉ Host / IP máy chủ Wyoming',
-                      hint: '192.168.1.100 hoặc localhost',
-                      icon: Icons.lan_rounded,
+                      controller: _brokerController,
+                      label: 'Địa chỉ broker',
+                      hint: 'test.mosquitto.org',
+                      icon: Icons.dns_rounded,
+                      iconColor: AppTheme.accentBlue,
                     ),
                     const SizedBox(height: 12),
                     _buildTextField(
-                      controller: _wyomingPortController,
-                      label: 'Port Wyoming (mặc định 10300)',
-                      hint: '10300',
+                      controller: _portController,
+                      label: 'Port',
+                      hint: '1883',
                       icon: Icons.numbers_rounded,
+                      iconColor: AppTheme.accentBlue,
                       keyboardType: TextInputType.number,
                     ),
                     const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: _isTestingWyoming
-                            ? null
-                            : _testWyomingConnection,
-                        icon: _isTestingWyoming
-                            ? const SizedBox(
-                                width: 14,
-                                height: 14,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: AppTheme.accentCyan,
-                                ),
-                              )
-                            : const Icon(Icons.network_check_rounded, size: 18),
-                        label: Text(
-                          _isTestingWyoming
-                              ? 'Đang kiểm tra...'
-                              : 'Kiểm tra kết nối Wyoming',
+                    _buildTextField(
+                      controller: _usernameController,
+                      label: 'Username (tùy chọn)',
+                      hint: '',
+                      icon: Icons.person_rounded,
+                      iconColor: AppTheme.accentBlue,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildTextField(
+                      controller: _passwordController,
+                      label: 'Password (tùy chọn)',
+                      hint: '',
+                      icon: Icons.lock_rounded,
+                      iconColor: AppTheme.accentBlue,
+                      obscureText: _obscurePassword,
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscurePassword
+                              ? Icons.visibility_rounded
+                              : Icons.visibility_off_rounded,
+                          color: AppTheme.textSecondary,
                         ),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppTheme.accentCyan,
-                          side: const BorderSide(color: AppTheme.accentCyan),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
+                        onPressed: () =>
+                            setState(() => _obscurePassword = !_obscurePassword),
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      '💡 Chạy máy chủ bằng Docker: docker run -d -p 10300:10300 ghcr.io/luuquangvu/wyoming-vietnamese',
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        color: AppTheme.textSecondary,
-                        fontStyle: FontStyle.italic,
-                      ),
+                    const SizedBox(height: 12),
+                    _buildTextField(
+                      controller: _topicPrefixController,
+                      label: 'Topic prefix',
+                      hint: 'smart_led',
+                      icon: Icons.topic_rounded,
+                      iconColor: AppTheme.accentBlue,
                     ),
                   ],
-                ],
+                ),
               ),
-            ),
-            const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
-            // VieNeu-TTS Vietnamese Neural TTS Section
-            _SectionHeader(
-              icon: Icons.record_voice_over_rounded,
-              title: 'VieNeu-TTS (Sửa phát âm tiếng Việt 48kHz)',
-            ),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: AppTheme.cardDark,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.borderDark),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Giọng đọc nơ-ron VieNeu-TTS',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 14,
-                              ),
-                            ),
-                            SizedBox(height: 3),
-                            Text(
-                              'Sửa phát âm chuẩn các thuật ngữ LED, WS2812, RGB, lux, cảm biến với âm sắc tiếng Việt 48kHz tự nhiên.',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: AppTheme.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Switch(
-                        value: _vieneuEnabled,
-                        activeColor: AppTheme.accentPurple,
-                        onChanged: (v) => setState(() => _vieneuEnabled = v),
-                      ),
-                    ],
-                  ),
-                  if (_vieneuEnabled) ...[
-                    const Divider(color: AppTheme.borderDark, height: 20),
-                    _buildTextField(
-                      controller: _vieneuUrlController,
-                      label: 'Địa chỉ máy chủ VieNeu-TTS',
-                      hint: 'http://192.168.1.100:23333/v1',
-                      icon: Icons.link_rounded,
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      value: VieNeuTtsService.availableVoices.contains(_vieneuVoice)
-                          ? _vieneuVoice
-                          : VieNeuTtsService.availableVoices.first,
-                      dropdownColor: AppTheme.surfaceDark,
-                      decoration: InputDecoration(
-                        labelText: 'Giọng đọc tiếng Việt (3 miền)',
-                        prefixIcon: const Icon(
-                          Icons.person_pin_rounded,
-                          color: AppTheme.accentPurple,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide:
-                              const BorderSide(color: AppTheme.borderDark),
-                        ),
-                      ),
-                      items: VieNeuTtsService.availableVoices.map((voice) {
-                        return DropdownMenuItem<String>(
-                          value: voice,
-                          child:
-                              Text(voice, style: const TextStyle(fontSize: 13)),
-                        );
-                      }).toList(),
-                      onChanged: (val) {
-                        if (val != null) setState(() => _vieneuVoice = val);
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    _buildTextField(
-                      controller: _vieneuApiKeyController,
-                      label: 'API Key (Tùy chọn nếu dùng cloud)',
-                      hint: 'Để trống nếu host local',
-                      icon: Icons.key_rounded,
-                      obscureText: true,
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed:
-                            _isTestingVieNeu ? null : _testVieNeuConnection,
-                        icon: _isTestingVieNeu
-                            ? const SizedBox(
-                                width: 14,
-                                height: 14,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: AppTheme.accentPurple,
-                                ),
-                              )
-                            : const Icon(Icons.volume_up_rounded, size: 18),
-                        label: Text(
-                          _isTestingVieNeu
-                              ? 'Đang kiểm tra & đọc thử...'
-                              : 'Kiểm tra kết nối & Thử giọng đọc',
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppTheme.accentPurple,
-                          side: const BorderSide(color: AppTheme.accentPurple),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+              // Wyoming Vietnamese Speech-to-Text Card
+              LiquidGlassCard(
+                borderRadius: 22,
+                tintColor: AppTheme.accentCyan,
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: _SectionHeader(
+                            icon: Icons.mic_external_on_rounded,
+                            title: 'Wyoming STT (luuquangvu)',
+                            color: AppTheme.accentCyan,
                           ),
                         ),
-                      ),
+                        Switch(
+                          value: _wyomingEnabled,
+                          activeThumbColor: AppTheme.accentCyan,
+                          onChanged: (v) => setState(() => _wyomingEnabled = v),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     const Text(
-                      '💡 Khởi chạy server: docker run --gpus all -p 23333:23333 pnnbao/vieneu-tts:latest\n'
-                      '⚡ Tự động sửa phát âm: "LED" -> "đèn lét", "WS2812" -> "đúp-liu...", "lux" -> "lắc". (Nếu server offline sẽ tự lùi về giọng máy nội bộ).',
+                      'Model Zipformer tiếng Việt chuyên dụng, kháng ồn tốt, nhận diện giọng 3 miền Bắc/Trung/Nam.',
                       style: TextStyle(
-                        fontSize: 10.5,
+                        fontSize: 12,
                         color: AppTheme.textSecondary,
-                        fontStyle: FontStyle.italic,
                         height: 1.4,
                       ),
                     ),
+                    if (_wyomingEnabled) ...[
+                      const SizedBox(height: 16),
+                      _buildTextField(
+                        controller: _wyomingHostController,
+                        label: 'Địa chỉ Host / IP máy chủ Wyoming',
+                        hint: '192.168.1.100 hoặc localhost',
+                        icon: Icons.lan_rounded,
+                        iconColor: AppTheme.accentCyan,
+                      ),
+                      const SizedBox(height: 12),
+                      _buildTextField(
+                        controller: _wyomingPortController,
+                        label: 'Port Wyoming (mặc định 10300)',
+                        hint: '10300',
+                        icon: Icons.numbers_rounded,
+                        iconColor: AppTheme.accentCyan,
+                        keyboardType: TextInputType.number,
+                      ),
+                      const SizedBox(height: 14),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 46,
+                        child: OutlinedButton.icon(
+                          onPressed: _isTestingWyoming
+                              ? null
+                              : _testWyomingConnection,
+                          icon: _isTestingWyoming
+                              ? const SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: AppTheme.accentCyan,
+                                  ),
+                                )
+                              : const Icon(Icons.network_check_rounded, size: 18),
+                          label: Text(
+                            _isTestingWyoming
+                                ? 'Đang kiểm tra kết nối...'
+                                : 'Kiểm tra kết nối Wyoming',
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppTheme.accentCyan,
+                            side: BorderSide(
+                              color: AppTheme.accentCyan.withValues(alpha: 0.6),
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        '💡 Docker: docker run -d -p 10300:10300 ghcr.io/luuquangvu/wyoming-vietnamese',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.accentCyan.withValues(alpha: 0.8),
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
                   ],
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // AI Settings
-            _SectionHeader(
-              icon: Icons.smart_toy_rounded,
-              title: 'Gemini AI API',
-            ),
-            const SizedBox(height: 12),
-            _buildTextField(
-              controller: _apiKeyController,
-              label: 'API Key',
-              hint: 'AIzaSy...',
-              icon: Icons.key_rounded,
-              obscureText: _obscureApiKey,
-              suffixIcon: IconButton(
-                icon: Icon(
-                  _obscureApiKey
-                      ? Icons.visibility_rounded
-                      : Icons.visibility_off_rounded,
-                  color: AppTheme.textSecondary,
                 ),
-                onPressed: () =>
-                    setState(() => _obscureApiKey = !_obscureApiKey),
               ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Hỗ trợ tự động xoay vòng 9 model Gemini khi hết quota.',
-              style: TextStyle(
-                color: AppTheme.accentBlue,
-                fontSize: 12,
+              const SizedBox(height: 20),
+
+              // VieNeu-TTS Vietnamese Neural Card
+              LiquidGlassCard(
+                borderRadius: 22,
+                tintColor: AppTheme.accentPurple,
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: _SectionHeader(
+                            icon: Icons.record_voice_over_rounded,
+                            title: 'VieNeu-TTS (48kHz)',
+                            color: AppTheme.accentPurple,
+                          ),
+                        ),
+                        Switch(
+                          value: _vieneuEnabled,
+                          activeThumbColor: AppTheme.accentPurple,
+                          onChanged: (v) => setState(() => _vieneuEnabled = v),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Sửa phát âm chuẩn các thuật ngữ LED, WS2812, RGB, lux, cảm biến với âm sắc tiếng Việt 48kHz tự nhiên.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textSecondary,
+                        height: 1.4,
+                      ),
+                    ),
+                    if (_vieneuEnabled) ...[
+                      const SizedBox(height: 16),
+                      _buildTextField(
+                        controller: _vieneuUrlController,
+                        label: 'Địa chỉ máy chủ VieNeu-TTS',
+                        hint: 'http://192.168.1.100:23333/v1',
+                        icon: Icons.link_rounded,
+                        iconColor: AppTheme.accentPurple,
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        initialValue: VieNeuTtsService.availableVoices.contains(_vieneuVoice)
+                            ? _vieneuVoice
+                            : VieNeuTtsService.availableVoices.first,
+                        dropdownColor: const Color(0xFF131A2B),
+                        style: const TextStyle(
+                          color: AppTheme.textPrimary,
+                          fontSize: 13,
+                        ),
+                        decoration: InputDecoration(
+                          labelText: 'Giọng đọc tiếng Việt (3 miền)',
+                          labelStyle: const TextStyle(
+                            color: AppTheme.textSecondary,
+                            fontSize: 13,
+                          ),
+                          prefixIcon: const Icon(
+                            Icons.person_pin_rounded,
+                            color: AppTheme.accentPurple,
+                          ),
+                          filled: true,
+                          fillColor: Colors.black.withValues(alpha: 0.25),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide(
+                              color: Colors.white.withValues(alpha: 0.12),
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: const BorderSide(
+                              color: AppTheme.accentPurple,
+                              width: 1.5,
+                            ),
+                          ),
+                        ),
+                        items: VieNeuTtsService.availableVoices.map((voice) {
+                          return DropdownMenuItem<String>(
+                            value: voice,
+                            child: Text(voice),
+                          );
+                        }).toList(),
+                        onChanged: (val) {
+                          if (val != null) setState(() => _vieneuVoice = val);
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      _buildTextField(
+                        controller: _vieneuApiKeyController,
+                        label: 'API Key (Tùy chọn)',
+                        hint: 'Để trống nếu host nội bộ',
+                        icon: Icons.key_rounded,
+                        iconColor: AppTheme.accentPurple,
+                        obscureText: true,
+                      ),
+                      const SizedBox(height: 14),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 46,
+                        child: OutlinedButton.icon(
+                          onPressed:
+                              _isTestingVieNeu ? null : _testVieNeuConnection,
+                          icon: _isTestingVieNeu
+                              ? const SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: AppTheme.accentPurple,
+                                  ),
+                                )
+                              : const Icon(Icons.volume_up_rounded, size: 18),
+                          label: Text(
+                            _isTestingVieNeu
+                                ? 'Đang kiểm tra & đọc thử...'
+                                : 'Kiểm tra & Thử giọng đọc',
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppTheme.accentPurple,
+                            side: BorderSide(
+                              color: AppTheme.accentPurple.withValues(alpha: 0.6),
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        '⚡ Tự sửa: "LED" -> "đèn lét", "WS2812" -> "đúp-liu...", "lux" -> "lắc". Tự fallback nếu offline.',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.accentPurple.withValues(alpha: 0.8),
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
-            // LED Settings
-            _SectionHeader(
-              icon: Icons.light,
-              title: 'Cài đặt LED',
-            ),
-            const SizedBox(height: 12),
-            _buildTextField(
-              controller: _numLedsController,
-              label: 'Số LED trong dải (WS2812)',
-              hint: '30',
-              icon: Icons.linear_scale_rounded,
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: 32),
+              // Gemini AI Settings Card
+              LiquidGlassCard(
+                borderRadius: 22,
+                tintColor: AppTheme.accentBlue,
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const _SectionHeader(
+                      icon: Icons.smart_toy_rounded,
+                      title: 'Gemini AI API',
+                      color: AppTheme.accentBlue,
+                    ),
+                    const SizedBox(height: 14),
+                    _buildTextField(
+                      controller: _apiKeyController,
+                      label: 'API Key',
+                      hint: 'AIzaSy...',
+                      icon: Icons.key_rounded,
+                      iconColor: AppTheme.accentBlue,
+                      obscureText: _obscureApiKey,
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscureApiKey
+                              ? Icons.visibility_rounded
+                              : Icons.visibility_off_rounded,
+                          color: AppTheme.textSecondary,
+                        ),
+                        onPressed: () =>
+                            setState(() => _obscureApiKey = !_obscureApiKey),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.autorenew_rounded,
+                          size: 15,
+                          color: AppTheme.accentCyan,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Tự động xoay vòng 9 model Gemini với phản hồi cực nhanh.',
+                            style: TextStyle(
+                              color: AppTheme.accentCyan.withValues(alpha: 0.85),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
 
-            // Save button
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: ElevatedButton.icon(
+              // LED Hardware Settings Card
+              LiquidGlassCard(
+                borderRadius: 22,
+                tintColor: AppTheme.accentOrange,
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const _SectionHeader(
+                      icon: Icons.lightbulb_rounded,
+                      title: 'Cài Đặt Phần Cứng LED',
+                      color: AppTheme.accentOrange,
+                    ),
+                    const SizedBox(height: 14),
+                    _buildTextField(
+                      controller: _numLedsController,
+                      label: 'Số LED trong dải (WS2812)',
+                      hint: '30',
+                      icon: Icons.linear_scale_rounded,
+                      iconColor: AppTheme.accentOrange,
+                      keyboardType: TextInputType.number,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 28),
+
+              // 3D Liquid Glass Save & Connect Button
+              LiquidGlassButton(
+                isPrimary: true,
+                glowColor: AppTheme.accentCyan,
+                borderRadius: 18,
+                padding: const EdgeInsets.symmetric(vertical: 16),
                 onPressed: _saveAndConnect,
-                icon: const Icon(Icons.save_rounded),
-                label: const Text(
-                  'Lưu & Kết nối',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                style: ElevatedButton.styleFrom(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.save_rounded, color: Colors.white, size: 20),
+                    SizedBox(width: 10),
+                    Text(
+                      'Lưu Cấu Hình & Kết Nối',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
 
-            // Disconnect button
-            if (mqtt.isConnected)
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: OutlinedButton.icon(
+              // Disconnect button if connected
+              if (mqtt.isConnected) ...[
+                const SizedBox(height: 14),
+                LiquidGlassButton(
+                  isPrimary: false,
+                  glowColor: AppTheme.accentRed,
+                  borderRadius: 18,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
                   onPressed: () => mqtt.disconnect(),
-                  icon: const Icon(Icons.link_off_rounded),
-                  label: const Text('Ngắt kết nối'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppTheme.accentRed,
-                    side: const BorderSide(color: AppTheme.accentRed),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.link_off_rounded,
+                          color: AppTheme.accentRed, size: 20),
+                      SizedBox(width: 8),
+                      Text(
+                        'Ngắt Kết Nối MQTT',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.accentRed,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-            const SizedBox(height: 32),
+              ],
+              const SizedBox(height: 28),
 
-            // About section
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppTheme.cardDark,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.borderDark),
-              ),
-              child: const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Smart LED Control v1.0',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  SizedBox(height: 4),
-                  Text(
-                    'App điều khiển đèn LED thông minh qua MQTT.\n'
-                    'Hỗ trợ ESP32 + WS2812 LED Strip.\n'
-                    'Tích hợp AI Gemini đa model + Wyoming STT + VieNeu-TTS (48kHz).',
-                    style: TextStyle(
-                      color: AppTheme.textSecondary,
-                      fontSize: 12,
-                      height: 1.5,
+              // About card
+              LiquidGlassCard(
+                borderRadius: 18,
+                padding: const EdgeInsets.all(16),
+                child: const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Smart LED 3D Liquid Glass • Tammi Edition',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        color: AppTheme.textPrimary,
+                      ),
                     ),
-                  ),
-                ],
+                    SizedBox(height: 6),
+                    Text(
+                      'Hệ thống điều khiển dải đèn thông minh ESP32 & WS2812.\n'
+                      'Tích hợp 9 Model Gemini Instant AI + Wyoming STT Tiếng Việt + VieNeu-TTS Neural 48kHz.',
+                      style: TextStyle(
+                        color: AppTheme.textSecondary,
+                        fontSize: 12,
+                        height: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -748,6 +834,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required String label,
     required String hint,
     required IconData icon,
+    Color iconColor = AppTheme.accentCyan,
     TextInputType? keyboardType,
     bool obscureText = false,
     Widget? suffixIcon,
@@ -756,12 +843,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
       controller: controller,
       keyboardType: keyboardType,
       obscureText: obscureText,
+      style: const TextStyle(
+        color: AppTheme.textPrimary,
+        fontSize: 14,
+      ),
       decoration: InputDecoration(
         labelText: label,
+        labelStyle: const TextStyle(
+          color: AppTheme.textSecondary,
+          fontSize: 13,
+        ),
         hintText: hint,
-        prefixIcon: Icon(icon, size: 20),
+        hintStyle: TextStyle(
+          color: Colors.white.withValues(alpha: 0.25),
+          fontSize: 13,
+        ),
+        prefixIcon: Icon(icon, size: 20, color: iconColor),
         suffixIcon: suffixIcon,
-        labelStyle: const TextStyle(color: AppTheme.textSecondary),
+        filled: true,
+        fillColor: Colors.black.withValues(alpha: 0.25),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(
+            color: Colors.white.withValues(alpha: 0.12),
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(
+            color: iconColor,
+            width: 1.5,
+          ),
+        ),
       ),
     );
   }
@@ -770,20 +884,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
 class _SectionHeader extends StatelessWidget {
   final IconData icon;
   final String title;
+  final Color color;
 
-  const _SectionHeader({required this.icon, required this.title});
+  const _SectionHeader({
+    required this.icon,
+    required this.title,
+    this.color = AppTheme.accentCyan,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, size: 20, color: AppTheme.accentBlue),
-        const SizedBox(width: 8),
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: color.withValues(alpha: 0.3)),
+          ),
+          child: Icon(icon, size: 16, color: color),
+        ),
+        const SizedBox(width: 10),
         Text(
           title,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+          style: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: AppTheme.textPrimary,
+          ),
         ),
       ],
     );
