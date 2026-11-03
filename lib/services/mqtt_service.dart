@@ -14,6 +14,7 @@ enum AppConnectionState {
 
 class MqttService extends ChangeNotifier {
   MqttServerClient? _client;
+  StreamSubscription<List<MqttReceivedMessage<MqttMessage>>>? _updatesSub;
   MqttConfig _config = const MqttConfig();
   AppConnectionState _connectionState = AppConnectionState.disconnected;
   String _errorMessage = '';
@@ -94,23 +95,30 @@ class MqttService extends ChangeNotifier {
   }
 
   void _setupMessageListener() {
-    _client!.updates?.listen((List<MqttReceivedMessage<MqttMessage>> messages) {
-      for (final msg in messages) {
-        final payload = msg.payload as MqttPublishMessage;
-        final data = MqttPublishPayload.bytesToStringAsString(
-          payload.payload.message,
-        );
-        final topic = msg.topic;
+    _updatesSub?.cancel();
+    _updatesSub = _client!.updates?.listen(
+      (List<MqttReceivedMessage<MqttMessage>> messages) {
+        for (final msg in messages) {
+          final payload = msg.payload as MqttPublishMessage;
+          final data = MqttPublishPayload.bytesToStringAsString(
+            payload.payload.message,
+          );
+          final topic = msg.topic;
 
-        if (_topicControllers.containsKey(topic)) {
-          _topicControllers[topic]!.add(data);
+          if (_topicControllers.containsKey(topic)) {
+            _topicControllers[topic]!.add(data);
+          }
         }
-      }
-    });
+      },
+    );
   }
 
   void disconnect() {
-    _client?.disconnect();
+    _updatesSub?.cancel();
+    _updatesSub = null;
+    try {
+      _client?.disconnect();
+    } catch (_) {}
     _connectionState = AppConnectionState.disconnected;
     notifyListeners();
   }
@@ -118,20 +126,26 @@ class MqttService extends ChangeNotifier {
   void publish(String topic, Map<String, dynamic> data) {
     if (!isConnected || _client == null) return;
 
-    final builder = MqttClientPayloadBuilder();
-    builder.addString(jsonEncode(data));
-
-    _client!.publishMessage(topic, MqttQos.atMostOnce, builder.payload!);
-    debugPrint('MQTT Published to $topic: ${jsonEncode(data)}');
+    try {
+      final builder = MqttClientPayloadBuilder();
+      builder.addString(jsonEncode(data));
+      _client!.publishMessage(topic, MqttQos.atMostOnce, builder.payload!);
+      debugPrint('MQTT Published to $topic: ${jsonEncode(data)}');
+    } catch (e) {
+      debugPrint('MQTT publish error on $topic: $e');
+    }
   }
 
   void publishString(String topic, String data) {
     if (!isConnected || _client == null) return;
 
-    final builder = MqttClientPayloadBuilder();
-    builder.addString(data);
-
-    _client!.publishMessage(topic, MqttQos.atMostOnce, builder.payload!);
+    try {
+      final builder = MqttClientPayloadBuilder();
+      builder.addString(data);
+      _client!.publishMessage(topic, MqttQos.atMostOnce, builder.payload!);
+    } catch (e) {
+      debugPrint('MQTT publishString error on $topic: $e');
+    }
   }
 
   Stream<String> subscribe(String topic) {
@@ -140,7 +154,11 @@ class MqttService extends ChangeNotifier {
     }
 
     if (isConnected && _client != null) {
-      _client!.subscribe(topic, MqttQos.atMostOnce);
+      try {
+        _client!.subscribe(topic, MqttQos.atMostOnce);
+      } catch (e) {
+        debugPrint('MQTT subscribe error on $topic: $e');
+      }
     }
 
     return _topicControllers[topic]!.stream;
@@ -150,9 +168,13 @@ class MqttService extends ChangeNotifier {
     debugPrint('MQTT Connected');
     _connectionState = AppConnectionState.connected;
 
-    // Re-subscribe to all topics
+    // Re-subscribe to all topics safely
     for (final topic in _topicControllers.keys) {
-      _client!.subscribe(topic, MqttQos.atMostOnce);
+      try {
+        _client?.subscribe(topic, MqttQos.atMostOnce);
+      } catch (e) {
+        debugPrint('MQTT resubscribe error on $topic: $e');
+      }
     }
 
     notifyListeners();
@@ -175,12 +197,16 @@ class MqttService extends ChangeNotifier {
   void _onAutoReconnected() {
     debugPrint('MQTT Auto Reconnected');
     _connectionState = AppConnectionState.connected;
+    _setupMessageListener();
     notifyListeners();
   }
 
   @override
   void dispose() {
-    _client?.disconnect();
+    _updatesSub?.cancel();
+    try {
+      _client?.disconnect();
+    } catch (_) {}
     for (final controller in _topicControllers.values) {
       controller.close();
     }

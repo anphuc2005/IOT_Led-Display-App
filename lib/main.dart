@@ -82,13 +82,23 @@ class _AppInitializerState extends State<_AppInitializer>
     final storage = context.read<StorageService>();
     final mqtt = context.read<MqttService>();
     final ai = context.read<AiService>();
+    final led = context.read<LedProvider>();
 
     // Load saved settings quickly from local storage
-    final config = await storage.loadMqttConfig();
-    final apiKey = await storage.loadGeminiApiKey();
+    final results = await Future.wait([
+      storage.loadMqttConfig(),
+      storage.loadGeminiApiKey(),
+      storage.loadNumLeds(),
+      storage.loadAutoMode(),
+    ]);
+    final config = results[0] as dynamic;
+    final apiKey = results[1] as String;
+    final numLeds = results[2] as int;
+    final autoMode = results[3] as bool;
 
     mqtt.updateConfig(config);
     ai.setApiKey(apiKey);
+    led.restoreSavedState(numLeds: numLeds, autoMode: autoMode);
 
     // Enter HomeScreen immediately without waiting for MQTT network timeout
     if (mounted) {

@@ -26,6 +26,13 @@ class LedProvider extends ChangeNotifier {
   bool get autoMode => _autoMode;
   List<SensorData> get lightHistory => List.unmodifiable(_lightHistory);
 
+  /// Restores persisted LED count and auto-mode state during app initialization
+  void restoreSavedState({required int numLeds, required bool autoMode}) {
+    _ledState = _ledState.copyWith(numLeds: numLeds.clamp(1, 300));
+    _autoMode = autoMode;
+    notifyListeners();
+  }
+
   void _onMqttChanged() {
     if (_mqttService.config.topicPrefix != _subscribedPrefix) {
       _setupSubscriptions();

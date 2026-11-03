@@ -16,6 +16,7 @@ class ColorPickerScreen extends StatefulWidget {
 
 class _ColorPickerScreenState extends State<ColorPickerScreen> {
   late Color _currentColor;
+  Color? _lastProviderColor;
   bool _initialized = false;
   int _selectedTab = 0; // 0: Vòng Màu, 1: Kelvin, 2: Kênh RGB, 3: Bộ Sưu Tập
   bool _wheelMode = true; // true: Bánh xe tròn, false: Bảng vuông HSV
@@ -117,8 +118,10 @@ class _ColorPickerScreenState extends State<ColorPickerScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (!_initialized) {
-      _currentColor = context.read<LedProvider>().ledState.color;
+    final providerColor = context.watch<LedProvider>().ledState.color;
+    if (!_initialized || _lastProviderColor != providerColor) {
+      _currentColor = providerColor;
+      _lastProviderColor = providerColor;
       _initialized = true;
     }
   }

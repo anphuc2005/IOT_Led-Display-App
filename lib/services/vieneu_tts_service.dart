@@ -10,6 +10,8 @@ import '../utils/pronunciation_helper.dart';
 /// with automatic pronunciation normalization for Smart LED technical terms.
 class VieNeuTtsService {
   final AudioPlayer _audioPlayer = AudioPlayer();
+  StreamSubscription<PlayerState>? _playerStateSub;
+  StreamSubscription<void>? _playerCompleteSub;
   http.Client? _activeClient;
   bool _isPlaying = false;
   bool _suppressAutoComplete = false;
@@ -30,7 +32,7 @@ class VieNeuTtsService {
 
   VieNeuTtsService() {
     _configureAudioPlayer();
-    _audioPlayer.onPlayerStateChanged.listen((state) {
+    _playerStateSub = _audioPlayer.onPlayerStateChanged.listen((state) {
       if (state == PlayerState.playing) {
         _isPlaying = true;
         onStart?.call();
@@ -42,7 +44,7 @@ class VieNeuTtsService {
       }
     });
 
-    _audioPlayer.onPlayerComplete.listen((_) {
+    _playerCompleteSub = _audioPlayer.onPlayerComplete.listen((_) {
       if (!_suppressAutoComplete) {
         _isPlaying = false;
         onComplete?.call();
@@ -206,6 +208,7 @@ class VieNeuTtsService {
     final completer = Completer<void>();
     StreamSubscription<void>? completeSub;
     StreamSubscription<PlayerState>? stateSub;
+    bool hasStartedPlaying = false;
 
     void finish() {
       if (!completer.isCompleted) {
@@ -215,7 +218,10 @@ class VieNeuTtsService {
 
     completeSub = _audioPlayer.onPlayerComplete.listen((_) => finish());
     stateSub = _audioPlayer.onPlayerStateChanged.listen((state) {
-      if (state == PlayerState.completed || state == PlayerState.stopped) {
+      if (state == PlayerState.playing) {
+        hasStartedPlaying = true;
+      } else if (state == PlayerState.completed ||
+          (hasStartedPlaying && state == PlayerState.stopped)) {
         finish();
       }
     });
@@ -497,6 +503,8 @@ class VieNeuTtsService {
 
   void dispose() {
     _sessionId++;
+    _playerStateSub?.cancel();
+    _playerCompleteSub?.cancel();
     _activeClient?.close();
     _audioPlayer.dispose();
   }

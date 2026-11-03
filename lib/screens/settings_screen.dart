@@ -65,7 +65,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _loadSettings() async {
-    final storage = StorageService();
+    final storage = context.read<StorageService>();
     final config = await storage.loadMqttConfig();
     final apiKey = await storage.loadGeminiApiKey();
     final numLeds = await storage.loadNumLeds();
@@ -93,7 +93,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _saveAndConnect() async {
-    final storage = StorageService();
+    final storage = context.read<StorageService>();
     final config = MqttConfig(
       broker: _brokerController.text.trim().isEmpty
           ? 'broker.hivemq.com'

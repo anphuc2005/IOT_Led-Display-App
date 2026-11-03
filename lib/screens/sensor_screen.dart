@@ -41,7 +41,7 @@ class SensorScreen extends StatelessWidget {
             ),
             const SizedBox(height: 22),
 
-            // 3D Liquid Glass Sensor cards row
+            // 3D Liquid Glass Sensor cards row (Light & PIR Motion)
             Row(
               children: [
                 Expanded(
@@ -63,6 +63,32 @@ class SensorScreen extends StatelessWidget {
                     accentColor: sensor.motionDetected
                         ? AppTheme.accentGreen
                         : AppTheme.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // 3D Liquid Glass Climate Sensor cards row (DHT11 Temperature & Humidity)
+            Row(
+              children: [
+                Expanded(
+                  child: _SensorCard3D(
+                    icon: Icons.thermostat_rounded,
+                    label: 'Nhiệt độ DHT11',
+                    value: '${sensor.temperature.toStringAsFixed(1)} °C',
+                    status: sensor.hasClimate ? 'Cảm biến DHT11 (GPIO 26)' : 'Giá trị mặc định',
+                    accentColor: AppTheme.accentRed,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _SensorCard3D(
+                    icon: Icons.water_drop_rounded,
+                    label: 'Độ ẩm không khí',
+                    value: '${sensor.humidity.toStringAsFixed(0)} %',
+                    status: sensor.hasClimate ? 'Đo trực tiếp từ ESP32' : 'Giá trị mặc định',
+                    accentColor: AppTheme.accentBlue,
                   ),
                 ),
               ],
@@ -187,6 +213,7 @@ class SensorScreen extends StatelessWidget {
                       )
                     : LineChart(
                         LineChartData(
+                          minY: 0,
                           gridData: FlGridData(
                             show: true,
                             drawVerticalLine: false,
@@ -235,6 +262,7 @@ class SensorScreen extends StatelessWidget {
                                       ))
                                   .toList(),
                               isCurved: true,
+                              preventCurveOverShooting: true,
                               curveSmoothness: 0.35,
                               gradient: AppTheme.sunsetGradient,
                               barWidth: 3,

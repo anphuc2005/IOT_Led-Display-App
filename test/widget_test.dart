@@ -2,6 +2,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:smart_led_control/models/chat_message.dart';
 import 'package:smart_led_control/models/led_state.dart';
+import 'package:smart_led_control/models/mqtt_config.dart';
+import 'package:smart_led_control/models/sensor_data.dart';
 import 'package:smart_led_control/providers/led_provider.dart';
 import 'package:smart_led_control/services/ai_service.dart';
 import 'package:smart_led_control/services/mqtt_service.dart';
@@ -16,6 +18,8 @@ void main() {
     final mqtt = MqttService();
     final provider = LedProvider(mqtt);
 
+    expect(provider.ledState.numLeds, equals(8));
+
     provider.executeCommands([
       {'action': 'power', 'state': 'on'},
       {'action': 'color', 'r': 255, 'g': 180, 'b': 100},
@@ -27,6 +31,32 @@ void main() {
     expect(provider.ledState.brightness, equals(20));
     expect(provider.ledState.effect, equals(LedEffect.breathing));
     expect(provider.ledState.effectSpeed, equals(800));
+  });
+
+  test('LedProvider.restoreSavedState restores numLeds and autoMode', () {
+    final mqtt = MqttService();
+    final provider = LedProvider(mqtt);
+
+    provider.restoreSavedState(numLeds: 16, autoMode: true);
+    expect(provider.ledState.numLeds, equals(16));
+    expect(provider.autoMode, isTrue);
+  });
+
+  test('MqttConfig defaults match ESP32 HiveMQ firmware configuration', () {
+    const config = MqttConfig();
+    expect(config.broker, equals('broker.hivemq.com'));
+    expect(config.port, equals(1883));
+    expect(config.topicPrefix, equals('smart_led'));
+    expect(config.colorTopic, equals('smart_led/color'));
+    expect(config.sensorClimateTopic, equals('smart_led/sensor/climate'));
+  });
+
+  test('SensorData lightLevel thresholds work accurately', () {
+    expect(SensorData(lightIntensity: 2).lightLevel, equals('Tối hoàn toàn'));
+    expect(SensorData(lightIntensity: 20).lightLevel, equals('Phòng tối'));
+    expect(SensorData(lightIntensity: 100).lightLevel, equals('Vừa phải'));
+    expect(SensorData(lightIntensity: 300).lightLevel, equals('Đủ sáng'));
+    expect(SensorData(lightIntensity: 800).lightLevel, equals('Rất sáng'));
   });
 
   test('AiService rotates through Gemini model pool properly', () {
@@ -47,11 +77,11 @@ void main() {
       commands: [
         {'action': 'power', 'state': 'on'},
       ],
-      modelUsed: 'gemini-3.5-flash-lite',
+      modelUsed: 'gemini-2.5-flash',
     );
     expect(msg.allCommands.length, equals(1));
     expect(msg.allCommands.first['action'], equals('power'));
-    expect(msg.modelUsed, equals('gemini-3.5-flash-lite'));
+    expect(msg.modelUsed, equals('gemini-2.5-flash'));
   });
 
   test('WyomingSttService initializes and reports not recording', () {
@@ -65,7 +95,7 @@ void main() {
   });
 
   test('PronunciationHelper correctly normalizes Smart LED technical terms', () {
-    final rawText = '💡 Đã bật đèn LED RGB WS2812 với độ sáng 85% và chu kỳ 50ms.';
+    const rawText = '💡 Đã bật đèn LED RGB WS2812 với độ sáng 85% và chu kỳ 50ms.';
     final normalized = PronunciationHelper.normalizeForTts(rawText);
 
     expect(normalized.contains('đèn lét'), isTrue);
@@ -77,7 +107,8 @@ void main() {
   });
 
   test('PronunciationHelper strips json codeblocks and normalizes sensor acronyms', () {
-    final rawText = 'Cảm biến PIR và BH1750 ghi nhận 400lux.\n```json\n{"action": "power"}\n```';
+    const rawText =
+        'Cảm biến PIR và BH1750 ghi nhận 400lux.\n```json\n{"action": "power"}\n```';
     final normalized = PronunciationHelper.normalizeForTts(rawText);
 
     expect(normalized.contains('cảm biến chuyển động pi-a'), isTrue);

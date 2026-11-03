@@ -678,10 +678,11 @@ BẢNG MÀU THAM CHIẾU CHUẨN:
     required String model,
     required String input,
   }) async {
+    final isGemma = model.startsWith('gemma');
     final Map<String, dynamic> generationConfig = {
       'temperature': 0.1,
       'maxOutputTokens': 700,
-      'responseMimeType': 'application/json',
+      if (!isGemma) 'responseMimeType': 'application/json',
     };
 
     // Disable thinking budget on 2.5 Flash models to eliminate delay
@@ -690,29 +691,35 @@ BẢNG MÀU THAM CHIẾU CHUẨN:
     }
 
     try {
+      final promptText = isGemma
+          ? '$_ledAgentSystemInstruction\n\n$input\n\n'
+              'Yêu cầu: Trả về DUY NHẤT một chuỗi JSON hợp lệ theo cấu trúc: {"response": "câu trả lời tiếng Việt ngắn gọn", "commands": [...]}.'
+          : '$input\n\n'
+              'Yêu cầu: Trả về DUY NHẤT một chuỗi JSON hợp lệ theo cấu trúc: {"response": "câu trả lời tiếng Việt ngắn gọn", "commands": [...]}.';
+
+      final bodyMap = <String, dynamic>{
+        if (!isGemma)
+          'systemInstruction': {
+            'parts': [
+              {'text': _ledAgentSystemInstruction}
+            ]
+          },
+        'contents': [
+          {
+            'role': 'user',
+            'parts': [
+              {'text': promptText}
+            ]
+          }
+        ],
+        'generationConfig': generationConfig,
+      };
+
       final response = await http
           .post(
             Uri.parse('$_modelsBaseUrl/$model:generateContent?key=$_apiKey'),
             headers: const {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'systemInstruction': {
-                'parts': [
-                  {'text': _ledAgentSystemInstruction}
-                ]
-              },
-              'contents': [
-                {
-                  'role': 'user',
-                  'parts': [
-                    {
-                      'text': '$input\n\n'
-                          'Yêu cầu: Trả về DUY NHẤT một chuỗi JSON hợp lệ theo cấu trúc: {"response": "câu trả lời tiếng Việt ngắn gọn", "commands": [...]}.'
-                    }
-                  ]
-                }
-              ],
-              'generationConfig': generationConfig,
-            }),
+            body: jsonEncode(bodyMap),
           )
           .timeout(const Duration(seconds: 8));
 
@@ -750,26 +757,40 @@ BẢNG MÀU THAM CHIẾU CHUẨN:
   }
 
   Map<String, dynamic>? _parseAgentJsonResponse(String rawText) {
-    final parsed =
-        jsonDecode(_cleanJsonString(rawText)) as Map<String, dynamic>;
-    final rawTranscript = parsed['transcript'] ??
-        parsed['transcription'] ??
-        parsed['user_text'] ??
-        parsed['text'];
-    final transcript = (rawTranscript as String?)?.trim();
-    final reply = (parsed['response'] as String?)?.trim() ??
-        'Mình đã xử lý yêu cầu về đèn cho bạn.';
-    final rawCommands = (parsed['commands'] as List<dynamic>?) ??
-        (parsed['command'] != null ? [parsed['command']] : const []);
-    final normalizedCommands = _normalizeCommands(rawCommands);
+    try {
+      final parsed =
+          jsonDecode(_cleanJsonString(rawText)) as Map<String, dynamic>;
+      final rawTranscript = parsed['transcript'] ??
+          parsed['transcription'] ??
+          parsed['user_text'] ??
+          parsed['text'];
+      final transcript = (rawTranscript as String?)?.trim();
+      final reply = (parsed['response'] as String?)?.trim() ??
+          'Mình đã xử lý yêu cầu về đèn cho bạn.';
+      final rawCommands = (parsed['commands'] as List<dynamic>?) ??
+          (parsed['command'] != null ? [parsed['command']] : const []);
+      final normalizedCommands = _normalizeCommands(rawCommands);
 
-    return {
-      if (transcript != null && transcript.isNotEmpty) 'transcript': transcript,
-      'response': reply,
-      'command':
-          normalizedCommands.isNotEmpty ? normalizedCommands.first : null,
-      'commands': normalizedCommands,
-    };
+      return {
+        if (transcript != null && transcript.isNotEmpty)
+          'transcript': transcript,
+        'response': reply,
+        'command':
+            normalizedCommands.isNotEmpty ? normalizedCommands.first : null,
+        'commands': normalizedCommands,
+      };
+    } catch (e) {
+      debugPrint('JSON parse fallback for agent output: $e');
+      final cleaned = rawText.replaceAll(RegExp(r'```[\s\S]*?```'), '').trim();
+      if (cleaned.isNotEmpty && !cleaned.startsWith('{')) {
+        return {
+          'response': cleaned,
+          'command': null,
+          'commands': <Map<String, dynamic>>[],
+        };
+      }
+      return null;
+    }
   }
 
   /// Built-in Local Smart LED Agent when all cloud models are out of quota or offline
@@ -964,7 +985,13 @@ BẢNG MÀU THAM CHIẾU CHUẨN:
     if (jsonStr.endsWith('```')) {
       jsonStr = jsonStr.substring(0, jsonStr.length - 3);
     }
-    return jsonStr.trim();
+    jsonStr = jsonStr.trim();
+    final firstBrace = jsonStr.indexOf('{');
+    final lastBrace = jsonStr.lastIndexOf('}');
+    if (firstBrace != -1 && lastBrace > firstBrace) {
+      jsonStr = jsonStr.substring(firstBrace, lastBrace + 1);
+    }
+    return jsonStr;
   }
 
   List<Map<String, dynamic>> _normalizeCommands(List<dynamic> rawCommands) {

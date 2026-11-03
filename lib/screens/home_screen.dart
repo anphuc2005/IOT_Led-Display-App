@@ -40,9 +40,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       extendBody: true,
       backgroundColor: Colors.transparent,
       body: LiquidBackground(
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 250),
-          child: screens[_currentIndex],
+        child: IndexedStack(
+          index: _currentIndex,
+          children: screens,
         ),
       ),
       bottomNavigationBar: _LiquidFloatingNavBar(

@@ -153,7 +153,7 @@ class LedState {
     this.brightness = 100,
     this.effect = LedEffect.none,
     this.effectSpeed = 500,
-    this.numLeds = 30,
+    this.numLeds = 8,
   });
 
   LedState copyWith({
