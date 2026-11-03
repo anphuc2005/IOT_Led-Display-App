@@ -30,52 +30,37 @@ class AiService extends ChangeNotifier {
     GeminiModelInfo(
       id: 'gemini-2.5-flash',
       name: 'Gemini 2.5 Flash (Tức thì - 0s Thinking)',
-      description: 'Phản hồi cực nhanh <1s, tắt hoàn toàn thinking delay',
+      description: 'Phản hồi cực nhanh <1s, hỗ trợ giọng nói & điều khiển tức thì',
     ),
     GeminiModelInfo(
-      id: 'gemini-3.5-flash-lite',
-      name: 'Gemini 3.5 Flash-Lite',
-      description: 'Model thế hệ mới, nhẹ và tiết kiệm quota',
+      id: 'gemini-2.5-flash-lite',
+      name: 'Gemini 2.5 Flash-Lite',
+      description: 'Siêu nhẹ, tiết kiệm quota, nhận diện giọng nói tiếng Việt nhanh',
     ),
     GeminiModelInfo(
-      id: 'gemini-3.1-flash-lite',
-      name: 'Gemini 3.1 Flash-Lite',
-      description: 'Nhẹ, tiết kiệm quota, độ trễ cực thấp',
+      id: 'gemini-2.0-flash',
+      name: 'Gemini 2.0 Flash',
+      description: 'Model đa phương thức ổn định, xử lý âm thanh & văn bản chính xác',
     ),
     GeminiModelInfo(
-      id: 'gemini-3.6-flash',
-      name: 'Gemini 3.6 Flash',
-      description: 'Model Flash ổn định, suy luận nhanh',
-    ),
-    GeminiModelInfo(
-      id: 'gemini-3.5-flash',
-      name: 'Gemini 3.5 Flash',
-      description: 'Model cân bằng tốc độ & độ chính xác',
+      id: 'gemini-2.0-flash-lite',
+      name: 'Gemini 2.0 Flash-Lite',
+      description: 'Nhẹ, tốc độ cao, dự phòng quota độc lập',
     ),
     GeminiModelInfo(
       id: 'gemini-3-flash-preview',
       name: 'Gemini 3 Flash Preview',
-      description: 'Model dự phòng tốc độ cao',
+      description: 'Model thế hệ mới tốc độ cao',
     ),
     GeminiModelInfo(
-      id: 'gemini-3.8-flash',
-      name: 'Gemini 3.8 Flash',
-      description: 'Model đa năng thế hệ mới nhất',
+      id: 'gemini-2.5-pro',
+      name: 'Gemini 2.5 Pro',
+      description: 'Model suy luận chuyên sâu và nhận diện âm thanh chính xác cao',
     ),
     GeminiModelInfo(
-      id: 'gemma-4-26b-a4b-it',
-      name: 'Gemma 4 26B MoE',
-      description: 'Model Gemma 4 MoE dự phòng khi Gemini hết quota',
-    ),
-    GeminiModelInfo(
-      id: 'gemma-4-31b-it',
-      name: 'Gemma 4 31B',
-      description: 'Model Gemma 4 Dense dự phòng độc lập',
-    ),
-    GeminiModelInfo(
-      id: 'gemini-4-argon',
-      name: 'Gemini 4 Argon',
-      description: 'Model mạnh nhất dự phòng cuối',
+      id: 'gemma-3-27b-it',
+      name: 'Gemma 3 27B IT',
+      description: 'Model Gemma dự phòng khi dòng Gemini hết lượt',
     ),
   ];
 
@@ -382,6 +367,235 @@ BẢNG MÀU THAM CHIẾU CHUẨN:
     return localResult;
   }
 
+  /// Transcribes Vietnamese microphone audio (16kHz 16-bit mono WAV) and processes Smart LED commands
+  /// using Gemini Multimodal Audio (works on all Android ROMs including Vivo V2419A OriginOS).
+  Future<Map<String, dynamic>?> processAudioCommand(
+    Uint8List wavBytes, {
+    String? deviceContext,
+  }) async {
+    if (_apiKey.isEmpty || wavBytes.length <= 44) {
+      return null;
+    }
+
+    final base64Audio = base64Encode(wavBytes);
+    final contextPrefix = deviceContext != null && deviceContext.isNotEmpty
+        ? '[$deviceContext]\n'
+        : '';
+
+    // Build candidate list prioritizing official multimodal Flash models
+    final audioModels = <String>[
+      modelPool[_currentModelIndex].id,
+      'gemini-2.5-flash',
+      'gemini-2.5-flash-lite',
+      'gemini-2.0-flash',
+      'gemini-2.0-flash-lite',
+      'gemini-3-flash-preview',
+      'gemini-2.5-pro',
+    ];
+    final seen = <String>{};
+    final orderedModels = <String>[];
+    for (final m in audioModels) {
+      if (seen.add(m) && !m.startsWith('gemma')) {
+        orderedModels.add(m);
+      }
+    }
+
+    for (final modelId in orderedModels) {
+      try {
+        final Map<String, dynamic> generationConfig = {
+          'temperature': 0.1,
+          'maxOutputTokens': 1024,
+          'responseMimeType': 'application/json',
+          'responseSchema': {
+            'type': 'OBJECT',
+            'properties': {
+              'transcript': {
+                'type': 'STRING',
+                'description':
+                    'Ghi lại chính xác câu tiếng Việt người dùng vừa nói trong đoạn âm thanh.',
+              },
+              'response': {
+                'type': 'STRING',
+                'description':
+                    'Câu trả lời tiếng Việt ngắn gọn, tự nhiên để đọc TTS.',
+              },
+              'commands': _responseFormat['schema']['properties']['commands'],
+            },
+            'required': ['transcript', 'response', 'commands'],
+          },
+        };
+        if (modelId == 'gemini-2.5-flash' ||
+            modelId == 'gemini-2.5-flash-lite') {
+          generationConfig['thinkingConfig'] = {'thinkingBudget': 0};
+        }
+
+        final response = await http
+            .post(
+              Uri.parse(
+                '$_modelsBaseUrl/$modelId:generateContent?key=$_apiKey',
+              ),
+              headers: const {'Content-Type': 'application/json'},
+              body: jsonEncode({
+                'systemInstruction': {
+                  'parts': [
+                    {'text': _ledAgentSystemInstruction}
+                  ]
+                },
+                'contents': [
+                  {
+                    'role': 'user',
+                    'parts': [
+                      {
+                        'inline_data': {
+                          'mime_type': 'audio/wav',
+                          'data': base64Audio,
+                        }
+                      },
+                      {
+                        'text': '${contextPrefix}Người dùng vừa nói bằng tiếng Việt qua microphone để hỏi về đèn LED hoặc ra lệnh điều khiển đèn LED.\n'
+                            'Hãy nghe đoạn âm thanh tiếng Việt này và trả về JSON hợp lệ gồm:\n'
+                            '1. "transcript": ghi lại chính xác câu tiếng Việt người dùng vừa nói.\n'
+                            '2. "response": câu trả lời tiếng Việt ngắn gọn, tự nhiên.\n'
+                            '3. "commands": mảng lệnh điều khiển đèn LED tương ứng.'
+                      }
+                    ]
+                  }
+                ],
+                'generationConfig': generationConfig,
+              }),
+            )
+            .timeout(const Duration(seconds: 15));
+
+        if (response.statusCode == 429 || response.statusCode == 503) {
+          _markModelCooldown(modelId, 'HTTP ${response.statusCode}');
+          continue;
+        }
+
+        if (response.statusCode != 200) {
+          debugPrint(
+            'Gemini Audio STT Error ($modelId): ${response.statusCode} ${response.body}',
+          );
+          continue;
+        }
+
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final candidates = data['candidates'] as List<dynamic>?;
+        if (candidates == null || candidates.isEmpty) continue;
+        final parts =
+            candidates.first['content']?['parts'] as List<dynamic>? ?? const [];
+        final buffer = StringBuffer();
+        for (final p in parts) {
+          if (p is Map && p['text'] != null) {
+            buffer.write(p['text']);
+          }
+        }
+        final text = buffer.toString().trim();
+        if (text.isEmpty) continue;
+
+        final parsed = _parseAgentJsonResponse(text);
+        if (parsed != null) {
+          _lastUsedModel = modelId;
+          notifyListeners();
+          return {
+            ...parsed,
+            'modelUsed': modelId,
+          };
+        }
+      } catch (e) {
+        debugPrint('Audio STT failed on $modelId: $e');
+      }
+    }
+    return null;
+  }
+
+  /// Transcribes Vietnamese microphone audio (WAV) directly into plain Vietnamese text
+  /// for inserting into the chat input box before sending.
+  Future<String?> transcribeAudioOnly(Uint8List wavBytes) async {
+    if (_apiKey.isEmpty || wavBytes.length <= 44) {
+      return null;
+    }
+
+    final base64Audio = base64Encode(wavBytes);
+    final audioModels = <String>[
+      modelPool[_currentModelIndex].id,
+      'gemini-2.5-flash',
+      'gemini-2.5-flash-lite',
+      'gemini-2.0-flash',
+      'gemini-2.0-flash-lite',
+    ];
+    final seen = <String>{};
+    final orderedModels = <String>[];
+    for (final m in audioModels) {
+      if (seen.add(m) && !m.startsWith('gemma')) {
+        orderedModels.add(m);
+      }
+    }
+
+    for (final modelId in orderedModels) {
+      try {
+        final Map<String, dynamic> generationConfig = {
+          'temperature': 0.0,
+          'maxOutputTokens': 256,
+        };
+        if (modelId == 'gemini-2.5-flash' ||
+            modelId == 'gemini-2.5-flash-lite') {
+          generationConfig['thinkingConfig'] = {'thinkingBudget': 0};
+        }
+
+        final response = await http
+            .post(
+              Uri.parse(
+                '$_modelsBaseUrl/$modelId:generateContent?key=$_apiKey',
+              ),
+              headers: const {'Content-Type': 'application/json'},
+              body: jsonEncode({
+                'contents': [
+                  {
+                    'role': 'user',
+                    'parts': [
+                      {
+                        'inline_data': {
+                          'mime_type': 'audio/wav',
+                          'data': base64Audio,
+                        }
+                      },
+                      {
+                        'text':
+                            'Hãy nghe đoạn ghi âm tiếng Việt này và chép lại CHÍNH XÁC từng từ người dùng vừa nói bằng tiếng Việt. Chỉ trả về đúng câu văn bản tiếng Việt đó, không giải thích, không thêm dấu ngoặc kép.'
+                      }
+                    ]
+                  }
+                ],
+                'generationConfig': generationConfig,
+              }),
+            )
+            .timeout(const Duration(seconds: 12));
+
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body) as Map<String, dynamic>;
+          final candidates = data['candidates'] as List<dynamic>?;
+          if (candidates == null || candidates.isEmpty) continue;
+          final parts =
+              candidates.first['content']?['parts'] as List<dynamic>? ??
+                  const [];
+          final buffer = StringBuffer();
+          for (final p in parts) {
+            if (p is Map && p['text'] != null) {
+              buffer.write(p['text']);
+            }
+          }
+          final transcript = buffer.toString().trim();
+          if (transcript.isNotEmpty) {
+            return transcript;
+          }
+        }
+      } catch (e) {
+        debugPrint('transcribeAudioOnly failed on $modelId: $e');
+      }
+    }
+    return null;
+  }
+
   void _markModelCooldown(String modelId, String errorMsg) {
     final isQuota = errorMsg.contains('429') ||
         errorMsg.toLowerCase().contains('quota') ||
@@ -405,7 +619,7 @@ BẢNG MÀU THAM CHIẾU CHUẨN:
       'response_format': _responseFormat,
       'generation_config': {
         'temperature': 0.25,
-        'max_output_tokens': 600,
+        'max_output_tokens': 700,
       },
     };
 
@@ -466,12 +680,12 @@ BẢNG MÀU THAM CHIẾU CHUẨN:
   }) async {
     final Map<String, dynamic> generationConfig = {
       'temperature': 0.1,
-      'maxOutputTokens': 250,
+      'maxOutputTokens': 700,
       'responseMimeType': 'application/json',
     };
 
-    // If model supports thinking (like gemini-2.5-flash), disable thinking budget to eliminate delay!
-    if (model.contains('2.5')) {
+    // Disable thinking budget on 2.5 Flash models to eliminate delay
+    if (model == 'gemini-2.5-flash' || model == 'gemini-2.5-flash-lite') {
       generationConfig['thinkingConfig'] = {'thinkingBudget': 0};
     }
 
@@ -500,7 +714,7 @@ BẢNG MÀU THAM CHIẾU CHUẨN:
               'generationConfig': generationConfig,
             }),
           )
-          .timeout(const Duration(seconds: 4));
+          .timeout(const Duration(seconds: 8));
 
       if (response.statusCode == 429 || response.statusCode == 503) {
         _markModelCooldown(model, 'HTTP ${response.statusCode}');
@@ -538,6 +752,11 @@ BẢNG MÀU THAM CHIẾU CHUẨN:
   Map<String, dynamic>? _parseAgentJsonResponse(String rawText) {
     final parsed =
         jsonDecode(_cleanJsonString(rawText)) as Map<String, dynamic>;
+    final rawTranscript = parsed['transcript'] ??
+        parsed['transcription'] ??
+        parsed['user_text'] ??
+        parsed['text'];
+    final transcript = (rawTranscript as String?)?.trim();
     final reply = (parsed['response'] as String?)?.trim() ??
         'Mình đã xử lý yêu cầu về đèn cho bạn.';
     final rawCommands = (parsed['commands'] as List<dynamic>?) ??
@@ -545,6 +764,7 @@ BẢNG MÀU THAM CHIẾU CHUẨN:
     final normalizedCommands = _normalizeCommands(rawCommands);
 
     return {
+      if (transcript != null && transcript.isNotEmpty) 'transcript': transcript,
       'response': reply,
       'command':
           normalizedCommands.isNotEmpty ? normalizedCommands.first : null,

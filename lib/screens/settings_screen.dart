@@ -4,8 +4,6 @@ import '../models/mqtt_config.dart';
 import '../services/mqtt_service.dart';
 import '../services/ai_service.dart';
 import '../services/storage_service.dart';
-import '../services/wyoming_stt_service.dart';
-import '../services/vieneu_tts_service.dart';
 import '../providers/led_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/liquid_glass.dart';
@@ -26,21 +24,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _apiKeyController = TextEditingController();
   final _numLedsController = TextEditingController();
 
-  // Wyoming Vietnamese STT settings
-  final _wyomingHostController = TextEditingController();
-  final _wyomingPortController = TextEditingController();
-  bool _wyomingEnabled = false;
-  bool _isTestingWyoming = false;
-
-  // VieNeu-TTS settings
-  final _vieneuUrlController = TextEditingController();
-  final _vieneuApiKeyController = TextEditingController();
-  String _vieneuVoice = 'Minh Quân';
-  bool _vieneuEnabled = false;
-  bool _isTestingVieNeu = false;
-
   bool _obscurePassword = true;
   bool _obscureApiKey = true;
+
+  static const List<Map<String, dynamic>> _brokerPresets = [
+    {
+      'name': '⚡ Chuẩn ESP32 (HiveMQ)',
+      'broker': 'broker.hivemq.com',
+      'port': 1883,
+      'topic': 'smart_led',
+      'leds': 8,
+    },
+    {
+      'name': '🌐 EMQX Public',
+      'broker': 'broker.emqx.io',
+      'port': 1883,
+      'topic': 'smart_led',
+      'leds': 8,
+    },
+    {
+      'name': '🦟 Mosquitto',
+      'broker': 'test.mosquitto.org',
+      'port': 1883,
+      'topic': 'smart_led',
+      'leds': 8,
+    },
+    {
+      'name': '🏠 Mạng LAN nội bộ',
+      'broker': '192.168.1.100',
+      'port': 1883,
+      'topic': 'smart_led',
+      'leds': 8,
+    },
+  ];
 
   @override
   void initState() {
@@ -54,15 +70,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final apiKey = await storage.loadGeminiApiKey();
     final numLeds = await storage.loadNumLeds();
 
-    final wyomingHost = await storage.loadWyomingHost();
-    final wyomingPort = await storage.loadWyomingPort();
-    final wyomingEnabled = await storage.loadWyomingEnabled();
-
-    final vieneuEnabled = await storage.loadVieNeuTtsEnabled();
-    final vieneuUrl = await storage.loadVieNeuTtsUrl();
-    final vieneuVoice = await storage.loadVieNeuTtsVoice();
-    final vieneuApiKey = await storage.loadVieNeuTtsApiKey();
-
+    if (!mounted) return;
     setState(() {
       _brokerController.text = config.broker;
       _portController.text = config.port.toString();
@@ -71,99 +79,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _topicPrefixController.text = config.topicPrefix;
       _apiKeyController.text = apiKey;
       _numLedsController.text = numLeds.toString();
-
-      _wyomingHostController.text = wyomingHost;
-      _wyomingPortController.text = wyomingPort.toString();
-      _wyomingEnabled = wyomingEnabled;
-
-      _vieneuEnabled = vieneuEnabled;
-      _vieneuUrlController.text = vieneuUrl;
-      _vieneuVoice = vieneuVoice;
-      _vieneuApiKeyController.text = vieneuApiKey;
     });
   }
 
-  Future<void> _testWyomingConnection() async {
-    final host = _wyomingHostController.text.trim();
-    final port = int.tryParse(_wyomingPortController.text.trim()) ?? 10300;
-
-    if (host.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Vui lòng nhập địa chỉ IP/Host máy chủ Wyoming.'),
-          backgroundColor: AppTheme.accentOrange,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-      );
-      return;
-    }
-
-    setState(() => _isTestingWyoming = true);
-    final wyomingService = WyomingSttService();
-    final ok = await wyomingService.testConnection(host, port);
-    await wyomingService.dispose();
-
-    if (!mounted) return;
-    setState(() => _isTestingWyoming = false);
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          ok
-              ? '✅ Kết nối máy chủ Wyoming Vietnamese ($host:$port) thành công!'
-              : '❌ Không thể kết nối tới Wyoming ($host:$port). Hãy kiểm tra IP và cổng.',
-        ),
-        backgroundColor: ok ? AppTheme.accentGreen : AppTheme.accentRed,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
-  }
-
-  Future<void> _testVieNeuConnection() async {
-    final url = _vieneuUrlController.text.trim();
-    if (url.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Vui lòng nhập địa chỉ máy chủ VieNeu-TTS.'),
-          backgroundColor: AppTheme.accentOrange,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-      );
-      return;
-    }
-
-    setState(() => _isTestingVieNeu = true);
-    final vieneuService = context.read<VieNeuTtsService>();
-    final result = await vieneuService.testConnection(
-      baseUrl: url,
-      voice: _vieneuVoice,
-      apiKey: _vieneuApiKeyController.text.trim().isNotEmpty
-          ? _vieneuApiKeyController.text.trim()
-          : null,
-    );
-
-    if (!mounted) return;
-    setState(() => _isTestingVieNeu = false);
-
-    final ok = result['success'] == true;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(result['message'] as String),
-        backgroundColor: ok ? AppTheme.accentGreen : AppTheme.accentRed,
-        duration: const Duration(seconds: 4),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
+  Future<void> _applyPresetAndConnect(Map<String, dynamic> preset) async {
+    setState(() {
+      _brokerController.text = preset['broker'] as String;
+      _portController.text = (preset['port'] as int).toString();
+      _topicPrefixController.text = preset['topic'] as String;
+      _numLedsController.text = (preset['leds'] as int).toString();
+    });
+    await _saveAndConnect();
   }
 
   Future<void> _saveAndConnect() async {
     final storage = StorageService();
     final config = MqttConfig(
-      broker: _brokerController.text.trim(),
+      broker: _brokerController.text.trim().isEmpty
+          ? 'broker.hivemq.com'
+          : _brokerController.text.trim(),
       port: int.tryParse(_portController.text) ?? 1883,
       username: _usernameController.text.trim(),
       password: _passwordController.text.trim(),
@@ -175,25 +109,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await storage.saveMqttConfig(config);
     await storage.saveGeminiApiKey(_apiKeyController.text.trim());
 
-    final numLeds = int.tryParse(_numLedsController.text) ?? 30;
+    final numLeds = int.tryParse(_numLedsController.text) ?? 8;
     await storage.saveNumLeds(numLeds);
-
-    // Save Wyoming Vietnamese STT config
-    final wyomingPort =
-        int.tryParse(_wyomingPortController.text.trim()) ?? 10300;
-    await storage.saveWyomingConfig(
-      host: _wyomingHostController.text.trim(),
-      port: wyomingPort,
-      enabled: _wyomingEnabled,
-    );
-
-    // Save VieNeu-TTS config
-    await storage.saveVieNeuTtsConfig(
-      enabled: _vieneuEnabled,
-      url: _vieneuUrlController.text.trim(),
-      voice: _vieneuVoice,
-      apiKey: _vieneuApiKeyController.text.trim(),
-    );
 
     if (!mounted) return;
 
@@ -214,8 +131,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       SnackBar(
         content: Text(
           mqtt.isConnected
-              ? 'Đã lưu cấu hình & kết nối MQTT thành công!'
-              : 'Đã lưu cài đặt. Lỗi MQTT: ${mqtt.errorMessage}',
+              ? '✅ Đã kết nối thành công tới ${config.broker} (Topic: ${config.topicPrefix})!'
+              : '⚠️ Đã lưu cài đặt. Chưa kết nối được MQTT: ${mqtt.errorMessage}',
         ),
         backgroundColor:
             mqtt.isConnected ? AppTheme.accentGreen : AppTheme.accentOrange,
@@ -234,16 +151,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _topicPrefixController.dispose();
     _apiKeyController.dispose();
     _numLedsController.dispose();
-    _wyomingHostController.dispose();
-    _wyomingPortController.dispose();
-    _vieneuUrlController.dispose();
-    _vieneuApiKeyController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final mqtt = context.watch<MqttService>();
+    final led = context.watch<LedProvider>();
+    final isConnecting = mqtt.connectionState == AppConnectionState.connecting;
 
     return LiquidBackground(
       child: Scaffold(
@@ -252,10 +167,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           backgroundColor: Colors.transparent,
           elevation: 0,
           title: const Text(
-            'Cài Đặt Hệ Thống',
+            'Kết Nối Phần Cứng & Cài Đặt',
             style: TextStyle(
               fontWeight: FontWeight.w800,
-              fontSize: 20,
+              fontSize: 19,
               letterSpacing: -0.3,
             ),
           ),
@@ -269,65 +184,213 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 3D Liquid Glass Connection status banner
+              // 3D Liquid Glass Connection status banner + Quick Test Button
               LiquidGlassCard(
                 borderRadius: 18,
-                tintColor: mqtt.isConnected ? AppTheme.accentGreen : AppTheme.accentRed,
+                tintColor: mqtt.isConnected
+                    ? AppTheme.accentGreen
+                    : (isConnecting
+                        ? AppTheme.accentOrange
+                        : AppTheme.accentRed),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                child: Row(
+                child: Column(
                   children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: (mqtt.isConnected ? AppTheme.accentGreen : AppTheme.accentRed)
-                            .withValues(alpha: 0.18),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: (mqtt.isConnected ? AppTheme.accentGreen : AppTheme.accentRed)
-                              .withValues(alpha: 0.4),
-                        ),
-                      ),
-                      child: Icon(
-                        mqtt.isConnected
-                            ? Icons.wifi_rounded
-                            : Icons.wifi_off_rounded,
-                        color: mqtt.isConnected
-                            ? AppTheme.accentGreen
-                            : AppTheme.accentRed,
-                        size: 20,
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            mqtt.isConnected
-                                ? 'Đã kết nối MQTT Broker'
-                                : 'Chưa kết nối MQTT',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 15,
-                              color: mqtt.isConnected
-                                  ? AppTheme.accentGreen
-                                  : AppTheme.accentRed,
+                    Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: (mqtt.isConnected
+                                    ? AppTheme.accentGreen
+                                    : AppTheme.accentRed)
+                                .withValues(alpha: 0.18),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: (mqtt.isConnected
+                                      ? AppTheme.accentGreen
+                                      : AppTheme.accentRed)
+                                  .withValues(alpha: 0.4),
                             ),
                           ),
-                          if (mqtt.errorMessage.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 2),
-                              child: Text(
-                                mqtt.errorMessage,
+                          child: isConnecting
+                              ? const Padding(
+                                  padding: EdgeInsets.all(10),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: AppTheme.accentOrange,
+                                  ),
+                                )
+                              : Icon(
+                                  mqtt.isConnected
+                                      ? Icons.wifi_rounded
+                                      : Icons.wifi_off_rounded,
+                                  color: mqtt.isConnected
+                                      ? AppTheme.accentGreen
+                                      : AppTheme.accentRed,
+                                  size: 20,
+                                ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                mqtt.isConnected
+                                    ? 'Đã kết nối MQTT (${mqtt.config.broker})'
+                                    : (isConnecting
+                                        ? 'Đang kết nối MQTT...'
+                                        : 'Chưa kết nối MQTT'),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 15,
+                                  color: mqtt.isConnected
+                                      ? AppTheme.accentGreen
+                                      : AppTheme.accentRed,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                mqtt.isConnected
+                                    ? 'Topic: ${mqtt.config.topicPrefix}/# • Sẵn sàng điều khiển ESP32'
+                                    : (mqtt.errorMessage.isNotEmpty
+                                        ? mqtt.errorMessage
+                                        : 'Bấm chọn cấu hình chuẩn ESP32 bên dưới để kết nối ngay'),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                   color: AppTheme.textSecondary,
                                   fontSize: 12,
                                 ),
                               ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (mqtt.isConnected) ...[
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            led.sendHardwareTestPing();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: const Text(
+                                  '⚡ Đã gửi tín hiệu bật sáng màu Cyan 100% tới mạch ESP32!',
+                                ),
+                                backgroundColor: AppTheme.accentGreen,
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.flash_on_rounded, size: 18),
+                          label: const Text(
+                            'Bật thử đèn trên mạch ESP32 ngay',
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppTheme.accentCyan,
+                            side: BorderSide(
+                              color: AppTheme.accentCyan.withValues(alpha: 0.6),
                             ),
-                        ],
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
                       ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // 1-Tap Quick Connect Hardware Card
+              LiquidGlassCard(
+                borderRadius: 22,
+                tintColor: AppTheme.accentCyan,
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const _SectionHeader(
+                      icon: Icons.bolt_rounded,
+                      title: 'Kết Nối Nhanh 1 Chạm (ESP32)',
+                      color: AppTheme.accentCyan,
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Chọn đúng máy chủ MQTT đang nạp trong code ESP32 để tự động điền và kết nối ngay lập tức:',
+                      style: TextStyle(
+                        color: AppTheme.textSecondary,
+                        fontSize: 12,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: _brokerPresets.map((preset) {
+                        final isSelected = _brokerController.text.trim() ==
+                            (preset['broker'] as String);
+                        return GestureDetector(
+                          onTap: () => _applyPresetAndConnect(preset),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? AppTheme.accentCyan.withValues(alpha: 0.25)
+                                  : Colors.white.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: isSelected
+                                    ? AppTheme.accentCyan
+                                    : Colors.white.withValues(alpha: 0.18),
+                                width: isSelected ? 1.5 : 1,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  isSelected
+                                      ? Icons.check_circle_rounded
+                                      : Icons.memory_rounded,
+                                  size: 14,
+                                  color: isSelected
+                                      ? AppTheme.accentCyan
+                                      : AppTheme.textSecondary,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  preset['name'] as String,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: isSelected
+                                        ? FontWeight.w800
+                                        : FontWeight.w600,
+                                    color: isSelected
+                                        ? Colors.white
+                                        : AppTheme.textPrimary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }).toList(),
                     ),
                   ],
                 ),
@@ -344,30 +407,55 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   children: [
                     const _SectionHeader(
                       icon: Icons.router_rounded,
-                      title: 'MQTT Broker',
+                      title: 'Cấu Hình MQTT Broker & Dải LED',
                       color: AppTheme.accentBlue,
                     ),
                     const SizedBox(height: 16),
                     _buildTextField(
                       controller: _brokerController,
-                      label: 'Địa chỉ broker',
-                      hint: 'test.mosquitto.org',
+                      label: 'Địa chỉ MQTT Broker',
+                      hint: 'broker.hivemq.com',
                       icon: Icons.dns_rounded,
                       iconColor: AppTheme.accentBlue,
                     ),
                     const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildTextField(
+                            controller: _portController,
+                            label: 'Port',
+                            hint: '1883',
+                            icon: Icons.numbers_rounded,
+                            iconColor: AppTheme.accentBlue,
+                            keyboardType: TextInputType.number,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _buildTextField(
+                            controller: _numLedsController,
+                            label: 'Số bóng LED',
+                            hint: '8',
+                            icon: Icons.linear_scale_rounded,
+                            iconColor: AppTheme.accentOrange,
+                            keyboardType: TextInputType.number,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
                     _buildTextField(
-                      controller: _portController,
-                      label: 'Port',
-                      hint: '1883',
-                      icon: Icons.numbers_rounded,
+                      controller: _topicPrefixController,
+                      label: 'Topic prefix (trùng với TOPIC_PREFIX trên ESP32)',
+                      hint: 'smart_led',
+                      icon: Icons.topic_rounded,
                       iconColor: AppTheme.accentBlue,
-                      keyboardType: TextInputType.number,
                     ),
                     const SizedBox(height: 12),
                     _buildTextField(
                       controller: _usernameController,
-                      label: 'Username (tùy chọn)',
+                      label: 'Username (để trống nếu dùng HiveMQ/Mosquitto)',
                       hint: '',
                       icon: Icons.person_rounded,
                       iconColor: AppTheme.accentBlue,
@@ -391,265 +479,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             setState(() => _obscurePassword = !_obscurePassword),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    _buildTextField(
-                      controller: _topicPrefixController,
-                      label: 'Topic prefix',
-                      hint: 'smart_led',
-                      icon: Icons.topic_rounded,
-                      iconColor: AppTheme.accentBlue,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // Wyoming Vietnamese Speech-to-Text Card
-              LiquidGlassCard(
-                borderRadius: 22,
-                tintColor: AppTheme.accentCyan,
-                padding: const EdgeInsets.all(18),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Expanded(
-                          child: _SectionHeader(
-                            icon: Icons.mic_external_on_rounded,
-                            title: 'Wyoming STT (luuquangvu)',
-                            color: AppTheme.accentCyan,
-                          ),
-                        ),
-                        Switch(
-                          value: _wyomingEnabled,
-                          activeThumbColor: AppTheme.accentCyan,
-                          onChanged: (v) => setState(() => _wyomingEnabled = v),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    const Text(
-                      'Model Zipformer tiếng Việt chuyên dụng, kháng ồn tốt, nhận diện giọng 3 miền Bắc/Trung/Nam.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppTheme.textSecondary,
-                        height: 1.4,
-                      ),
-                    ),
-                    if (_wyomingEnabled) ...[
-                      const SizedBox(height: 16),
-                      _buildTextField(
-                        controller: _wyomingHostController,
-                        label: 'Địa chỉ Host / IP máy chủ Wyoming',
-                        hint: '192.168.1.100 hoặc localhost',
-                        icon: Icons.lan_rounded,
-                        iconColor: AppTheme.accentCyan,
-                      ),
-                      const SizedBox(height: 12),
-                      _buildTextField(
-                        controller: _wyomingPortController,
-                        label: 'Port Wyoming (mặc định 10300)',
-                        hint: '10300',
-                        icon: Icons.numbers_rounded,
-                        iconColor: AppTheme.accentCyan,
-                        keyboardType: TextInputType.number,
-                      ),
-                      const SizedBox(height: 14),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 46,
-                        child: OutlinedButton.icon(
-                          onPressed: _isTestingWyoming
-                              ? null
-                              : _testWyomingConnection,
-                          icon: _isTestingWyoming
-                              ? const SizedBox(
-                                  width: 14,
-                                  height: 14,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: AppTheme.accentCyan,
-                                  ),
-                                )
-                              : const Icon(Icons.network_check_rounded, size: 18),
-                          label: Text(
-                            _isTestingWyoming
-                                ? 'Đang kiểm tra kết nối...'
-                                : 'Kiểm tra kết nối Wyoming',
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: AppTheme.accentCyan,
-                            side: BorderSide(
-                              color: AppTheme.accentCyan.withValues(alpha: 0.6),
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        '💡 Docker: docker run -d -p 10300:10300 ghcr.io/luuquangvu/wyoming-vietnamese',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: AppTheme.accentCyan.withValues(alpha: 0.8),
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // VieNeu-TTS Vietnamese Neural Card
-              LiquidGlassCard(
-                borderRadius: 22,
-                tintColor: AppTheme.accentPurple,
-                padding: const EdgeInsets.all(18),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Expanded(
-                          child: _SectionHeader(
-                            icon: Icons.record_voice_over_rounded,
-                            title: 'VieNeu-TTS (48kHz)',
-                            color: AppTheme.accentPurple,
-                          ),
-                        ),
-                        Switch(
-                          value: _vieneuEnabled,
-                          activeThumbColor: AppTheme.accentPurple,
-                          onChanged: (v) => setState(() => _vieneuEnabled = v),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    const Text(
-                      'Sửa phát âm chuẩn các thuật ngữ LED, WS2812, RGB, lux, cảm biến với âm sắc tiếng Việt 48kHz tự nhiên.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppTheme.textSecondary,
-                        height: 1.4,
-                      ),
-                    ),
-                    if (_vieneuEnabled) ...[
-                      const SizedBox(height: 16),
-                      _buildTextField(
-                        controller: _vieneuUrlController,
-                        label: 'Địa chỉ máy chủ VieNeu-TTS',
-                        hint: 'http://192.168.1.100:23333/v1',
-                        icon: Icons.link_rounded,
-                        iconColor: AppTheme.accentPurple,
-                      ),
-                      const SizedBox(height: 12),
-                      DropdownButtonFormField<String>(
-                        initialValue: VieNeuTtsService.availableVoices.contains(_vieneuVoice)
-                            ? _vieneuVoice
-                            : VieNeuTtsService.availableVoices.first,
-                        dropdownColor: const Color(0xFF131A2B),
-                        style: const TextStyle(
-                          color: AppTheme.textPrimary,
-                          fontSize: 13,
-                        ),
-                        decoration: InputDecoration(
-                          labelText: 'Giọng đọc tiếng Việt (3 miền)',
-                          labelStyle: const TextStyle(
-                            color: AppTheme.textSecondary,
-                            fontSize: 13,
-                          ),
-                          prefixIcon: const Icon(
-                            Icons.person_pin_rounded,
-                            color: AppTheme.accentPurple,
-                          ),
-                          filled: true,
-                          fillColor: Colors.black.withValues(alpha: 0.25),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 14,
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: BorderSide(
-                              color: Colors.white.withValues(alpha: 0.12),
-                            ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: const BorderSide(
-                              color: AppTheme.accentPurple,
-                              width: 1.5,
-                            ),
-                          ),
-                        ),
-                        items: VieNeuTtsService.availableVoices.map((voice) {
-                          return DropdownMenuItem<String>(
-                            value: voice,
-                            child: Text(voice),
-                          );
-                        }).toList(),
-                        onChanged: (val) {
-                          if (val != null) setState(() => _vieneuVoice = val);
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      _buildTextField(
-                        controller: _vieneuApiKeyController,
-                        label: 'API Key (Tùy chọn)',
-                        hint: 'Để trống nếu host nội bộ',
-                        icon: Icons.key_rounded,
-                        iconColor: AppTheme.accentPurple,
-                        obscureText: true,
-                      ),
-                      const SizedBox(height: 14),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 46,
-                        child: OutlinedButton.icon(
-                          onPressed:
-                              _isTestingVieNeu ? null : _testVieNeuConnection,
-                          icon: _isTestingVieNeu
-                              ? const SizedBox(
-                                  width: 14,
-                                  height: 14,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: AppTheme.accentPurple,
-                                  ),
-                                )
-                              : const Icon(Icons.volume_up_rounded, size: 18),
-                          label: Text(
-                            _isTestingVieNeu
-                                ? 'Đang kiểm tra & đọc thử...'
-                                : 'Kiểm tra & Thử giọng đọc',
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: AppTheme.accentPurple,
-                            side: BorderSide(
-                              color: AppTheme.accentPurple.withValues(alpha: 0.6),
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        '⚡ Tự sửa: "LED" -> "đèn lét", "WS2812" -> "đúp-liu...", "lux" -> "lắc". Tự fallback nếu offline.',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: AppTheme.accentPurple.withValues(alpha: 0.8),
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ),
@@ -658,23 +487,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
               // Gemini AI Settings Card
               LiquidGlassCard(
                 borderRadius: 22,
-                tintColor: AppTheme.accentBlue,
+                tintColor: AppTheme.accentPurple,
                 padding: const EdgeInsets.all(18),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const _SectionHeader(
                       icon: Icons.smart_toy_rounded,
-                      title: 'Gemini AI API',
-                      color: AppTheme.accentBlue,
+                      title: 'Trợ Lý AI Điều Khiển Đèn (Gemini)',
+                      color: AppTheme.accentPurple,
                     ),
                     const SizedBox(height: 14),
                     _buildTextField(
                       controller: _apiKeyController,
-                      label: 'API Key',
+                      label: 'Gemini API Key',
                       hint: 'AIzaSy...',
                       icon: Icons.key_rounded,
-                      iconColor: AppTheme.accentBlue,
+                      iconColor: AppTheme.accentPurple,
                       obscureText: _obscureApiKey,
                       suffixIcon: IconButton(
                         icon: Icon(
@@ -691,14 +520,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Row(
                       children: [
                         const Icon(
-                          Icons.autorenew_rounded,
+                          Icons.mic_rounded,
                           size: 15,
                           color: AppTheme.accentCyan,
                         ),
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
-                            'Tự động xoay vòng 9 model Gemini với phản hồi cực nhanh.',
+                            'Nhận diện giọng nói & đọc phản hồi tiếng Việt hoạt động trực tiếp trên điện thoại (không cần API giọng nói).',
                             style: TextStyle(
                               color: AppTheme.accentCyan.withValues(alpha: 0.85),
                               fontSize: 12,
@@ -711,34 +540,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
-
-              // LED Hardware Settings Card
-              LiquidGlassCard(
-                borderRadius: 22,
-                tintColor: AppTheme.accentOrange,
-                padding: const EdgeInsets.all(18),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const _SectionHeader(
-                      icon: Icons.lightbulb_rounded,
-                      title: 'Cài Đặt Phần Cứng LED',
-                      color: AppTheme.accentOrange,
-                    ),
-                    const SizedBox(height: 14),
-                    _buildTextField(
-                      controller: _numLedsController,
-                      label: 'Số LED trong dải (WS2812)',
-                      hint: '30',
-                      icon: Icons.linear_scale_rounded,
-                      iconColor: AppTheme.accentOrange,
-                      keyboardType: TextInputType.number,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 24),
 
               // 3D Liquid Glass Save & Connect Button
               LiquidGlassButton(
@@ -752,13 +554,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   children: [
                     Icon(Icons.save_rounded, color: Colors.white, size: 20),
                     SizedBox(width: 10),
-                    Text(
-                      'Lưu Cấu Hình & Kết Nối',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        letterSpacing: 0.2,
+                    Flexible(
+                      child: Text(
+                        'Lưu Cấu Hình & Kết Nối Ngay',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          letterSpacing: 0.2,
+                        ),
                       ),
                     ),
                   ],
@@ -780,43 +586,62 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       Icon(Icons.link_off_rounded,
                           color: AppTheme.accentRed, size: 20),
                       SizedBox(width: 8),
-                      Text(
-                        'Ngắt Kết Nối MQTT',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.accentRed,
+                      Flexible(
+                        child: Text(
+                          'Ngắt Kết Nối MQTT',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.accentRed,
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
               ],
-              const SizedBox(height: 28),
+              const SizedBox(height: 24),
 
-              // About card
+              // Hardware Pinout Reference Card
               LiquidGlassCard(
                 borderRadius: 18,
                 padding: const EdgeInsets.all(16),
                 child: const Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Smart LED 3D Liquid Glass • Tammi Edition',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                        color: AppTheme.textPrimary,
-                      ),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.developer_board_rounded,
+                          size: 18,
+                          color: AppTheme.accentCyan,
+                        ),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Sơ Đồ Chân Mạch Phần Cứng ESP32',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                              color: AppTheme.textPrimary,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    SizedBox(height: 6),
+                    SizedBox(height: 8),
                     Text(
-                      'Hệ thống điều khiển dải đèn thông minh ESP32 & WS2812.\n'
-                      'Tích hợp 9 Model Gemini Instant AI + Wyoming STT Tiếng Việt + VieNeu-TTS Neural 48kHz.',
+                      '• Dải LED WS2812 (8 bóng): Chân DATA -> GPIO 18\n'
+                      '• Cảm biến ánh sáng BH1750: SDA -> GPIO 21, SCL -> GPIO 22\n'
+                      '• Cảm biến chuyển động PIR: OUT -> GPIO 27\n'
+                      '• Cảm biến nhiệt ẩm DHT11: DATA -> GPIO 26\n'
+                      '• MQTT mặc định trên ESP32: broker.hivemq.com:1883 (topic: smart_led)',
                       style: TextStyle(
                         color: AppTheme.textSecondary,
                         fontSize: 12,
-                        height: 1.5,
+                        height: 1.55,
                       ),
                     ),
                   ],
@@ -919,13 +744,17 @@ class _SectionHeader extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 12),
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 15.5,
-            fontWeight: FontWeight.w700,
-            color: AppTheme.textPrimary,
-            letterSpacing: -0.2,
+        Expanded(
+          child: Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 15.5,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.textPrimary,
+              letterSpacing: -0.2,
+            ),
           ),
         ),
       ],

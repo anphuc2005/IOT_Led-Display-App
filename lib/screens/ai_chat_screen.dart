@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:provider/provider.dart';
+import 'package:record/record.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:uuid/uuid.dart';
@@ -37,10 +39,20 @@ class _AiChatScreenState extends State<AiChatScreen>
   final FlutterTts _tts = FlutterTts();
   final SpeechToText _speech = SpeechToText();
   final WyomingSttService _wyomingStt = WyomingSttService();
+  final AudioRecorder _audioRecorder = AudioRecorder();
+  StreamSubscription<Uint8List>? _directRecordSub;
+  BytesBuilder _pcmBuffer = BytesBuilder(copy: false);
+  bool _isRecordingDirectAudio = false;
+  bool _hasDetectedVoice = false;
+  int _noiseFloor = 300;
+  double _currentMicLevel = 0.2;
+  DateTime? _recordStartTime;
+  DateTime? _lastVoiceTime;
 
   bool _isLoading = false;
   bool _voiceEnabled = true;
   bool _isSpeaking = false;
+  bool _localViTtsAvailable = false;
   String? _speakingMessageId;
 
   // VieNeu-TTS settings
@@ -52,7 +64,6 @@ class _AiChatScreenState extends State<AiChatScreen>
   bool _speechAvailable = false;
   bool _isListening = false;
   bool _isUsingWyoming = false;
-  bool _wyomingConfigured = false;
   String _partialSpeech = '';
   bool _showQuickControls = false;
 
@@ -71,13 +82,8 @@ class _AiChatScreenState extends State<AiChatScreen>
     _messages.add(ChatMessage(
       id: welcomeId,
       content:
-          'Xin chào! Mình là Smart LED Agent — trợ lý AI chuyên trách hệ thống đèn LED thông minh (hỗ trợ tự động xoay vòng 9 model Gemini khi hết lượt).\n\n'
-          'Bạn có thể hỏi thông tin về đèn hoặc yêu cầu điều khiển đèn:\n'
-          '❓ "Đèn đang màu gì, độ sáng bao nhiêu?"\n'
-          '❓ "Hệ thống đèn có những hiệu ứng nào?"\n'
-          '💡 "Bật đèn trắng mát để học bài"\n'
-          '🔆 "Hơi tối, tăng độ sáng lên chút đi"\n'
-          '🌈 "Cho đèn chạy hiệu ứng cầu vồng nhanh"',
+          'Xin chào! Mình là Trợ lý AI điều khiển đèn LED thông minh.\n'
+          'Bạn có thể chạm nút Micro 🎙️ để nói bằng tiếng Việt hoặc chọn nhanh các gợi ý bên dưới để bật/tắt, đổi màu và chỉnh hiệu ứng đèn nhé!',
       isUser: false,
       timestamp: DateTime.now(),
       modelUsed: 'smart-led-agent',
@@ -91,8 +97,6 @@ class _AiChatScreenState extends State<AiChatScreen>
     final vieneu = context.read<VieNeuTtsService>();
 
     final savedVoice = await storage.loadVoiceEnabled();
-    final wyEnabled = await storage.loadWyomingEnabled();
-    final wyHost = await storage.loadWyomingHost();
     final vieneuEnabled = await storage.loadVieNeuTtsEnabled();
     final vieneuUrl = await storage.loadVieNeuTtsUrl();
     final vieneuVoice = await storage.loadVieNeuTtsVoice();
@@ -101,7 +105,6 @@ class _AiChatScreenState extends State<AiChatScreen>
     if (mounted) {
       setState(() {
         _voiceEnabled = savedVoice;
-        _wyomingConfigured = wyEnabled && wyHost.isNotEmpty;
         _vieneuEnabled = vieneuEnabled && vieneuUrl.isNotEmpty;
         _vieneuUrl = vieneuUrl;
         _vieneuVoice = vieneuVoice;
@@ -149,9 +152,23 @@ class _AiChatScreenState extends State<AiChatScreen>
           ],
           IosTextToSpeechAudioMode.voicePrompt,
         );
+      } else if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+        try {
+          await _tts.setEngine('com.google.android.tts');
+        } catch (_) {}
       }
 
-      await _tts.setLanguage('vi-VN');
+      try {
+        final viAvail = await _tts.isLanguageAvailable('vi-VN');
+        final viShortAvail = await _tts.isLanguageAvailable('vi');
+        _localViTtsAvailable = (viAvail == true || viShortAvail == true);
+      } catch (_) {
+        _localViTtsAvailable = false;
+      }
+
+      if (_localViTtsAvailable) {
+        await _tts.setLanguage('vi-VN');
+      }
       await _tts.setSpeechRate(
         !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS ? 0.50 : 0.55,
       );
@@ -198,6 +215,8 @@ class _AiChatScreenState extends State<AiChatScreen>
 
   @override
   void dispose() {
+    _directRecordSub?.cancel();
+    _audioRecorder.dispose();
     _tts.stop();
     try {
       context.read<VieNeuTtsService>().stop();
@@ -235,9 +254,10 @@ class _AiChatScreenState extends State<AiChatScreen>
         _speakingMessageId = messageId;
       });
 
-      // Try VieNeu-TTS if enabled
+      final vieneu = context.read<VieNeuTtsService>();
+
+      // 1. Try custom VieNeu-TTS server if explicitly enabled
       if (_vieneuEnabled && _vieneuUrl.isNotEmpty) {
-        final vieneu = context.read<VieNeuTtsService>();
         final ok = await vieneu.speak(
           text: normalized,
           baseUrl: _vieneuUrl,
@@ -245,11 +265,24 @@ class _AiChatScreenState extends State<AiChatScreen>
           apiKey: _vieneuApiKey,
         );
         if (ok) return;
-        debugPrint('VieNeu-TTS failed; falling back to local flutter_tts');
       }
 
-      // Local device TTS fallback
-      await _tts.speak(normalized);
+      // 2. Always use built-in Vietnamese Cloud TTS first so phones without local Vietnamese TTS
+      // (such as Vivo V2419A / OriginOS China ROM) speak 100% natural Vietnamese instead of English
+      final cloudOk = await vieneu.speakVietnameseCloud(normalized);
+      if (cloudOk) return;
+
+      // 3. Offline local device TTS fallback (only if Vietnamese voice pack is actually installed)
+      if (_localViTtsAvailable) {
+        await _tts.speak(normalized);
+      } else {
+        if (mounted) {
+          setState(() {
+            _isSpeaking = false;
+            _speakingMessageId = null;
+          });
+        }
+      }
     } catch (e) {
       debugPrint('Error speaking text: $e');
       if (mounted) {
@@ -279,7 +312,9 @@ class _AiChatScreenState extends State<AiChatScreen>
     if (_isLoading) return;
 
     if (_isListening) {
-      if (_isUsingWyoming) {
+      if (_isRecordingDirectAudio) {
+        await _stopAndSendDirectAudioRecording();
+      } else if (_isUsingWyoming) {
         setState(() => _isListening = false);
         final transcript = await _wyomingStt.stopListening();
         if (transcript != null && transcript.trim().isNotEmpty) {
@@ -297,6 +332,7 @@ class _AiChatScreenState extends State<AiChatScreen>
     }
 
     final storage = context.read<StorageService>();
+    final aiService = context.read<AiService>();
 
     // Stop AI TTS before listening to user
     if (_isSpeaking) {
@@ -313,8 +349,8 @@ class _AiChatScreenState extends State<AiChatScreen>
       _isUsingWyoming = true;
       setState(() {
         _isListening = true;
-        _wyomingConfigured = true;
-        _partialSpeech = 'Đang nghe bằng Wyoming Vietnamese STT ($wyHost:$wyPort)...';
+        _partialSpeech =
+            'Đang nghe bằng Wyoming Vietnamese STT ($wyHost:$wyPort)...';
       });
 
       await _wyomingStt.startListening(
@@ -329,49 +365,36 @@ class _AiChatScreenState extends State<AiChatScreen>
         },
         onError: (err) async {
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Wyoming lỗi: $err. Đang chuyển sang nhận diện trên máy.'),
-              backgroundColor: AppTheme.accentOrange,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-          );
           await _wyomingStt.cancelListening();
-          _startDeviceListening();
+          await _startDirectAudioRecording();
         },
       );
       return;
     }
 
     _isUsingWyoming = false;
+
+    // When Gemini API Key is configured, use direct hardware PCM microphone recording + Gemini Audio STT
+    // so it works 100% reliably on all devices (including Vivo V2419A OriginOS where system SpeechRecognizer lacks Vietnamese)
+    if (aiService.hasApiKey) {
+      await _startDirectAudioRecording();
+      return;
+    }
+
     await _startDeviceListening();
   }
 
-  Future<void> _startDeviceListening() async {
+  /// Records 16kHz 16-bit Mono PCM directly from the hardware microphone using `AudioRecorder`
+  /// and transcribes + processes Vietnamese speech via Gemini Multimodal Audio.
+  Future<void> _startDirectAudioRecording() async {
     try {
-      if (!_speechAvailable) {
-        _speechAvailable = await _speech.initialize(
-          onStatus: (status) {
-            if ((status == 'done' || status == 'notListening') && mounted) {
-              setState(() => _isListening = false);
-            }
-          },
-          onError: (error) {
-            debugPrint('Speech recognition error: $error');
-            if (mounted) {
-              setState(() => _isListening = false);
-            }
-          },
-        );
-      }
-
-      if (!_speechAvailable) {
+      final hasPerm = await _audioRecorder.hasPermission();
+      if (!hasPerm) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text(
-              'Thiết bị chưa cấp quyền Micro hoặc không hỗ trợ nhận diện giọng nói.',
+              'Vui lòng cấp quyền Micro (Ghi âm) cho ứng dụng để nói chuyện bằng giọng nói.',
             ),
             backgroundColor: AppTheme.accentOrange,
             behavior: SnackBarBehavior.floating,
@@ -379,6 +402,415 @@ class _AiChatScreenState extends State<AiChatScreen>
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
         );
+        return;
+      }
+
+      await _directRecordSub?.cancel();
+      _pcmBuffer = BytesBuilder(copy: false);
+      _isRecordingDirectAudio = true;
+      _hasDetectedVoice = false;
+      _noiseFloor = 300;
+      _currentMicLevel = 0.2;
+      final now = DateTime.now();
+      _recordStartTime = now;
+      _lastVoiceTime = now;
+
+      setState(() {
+        _isListening = true;
+        _isUsingWyoming = false;
+        _partialSpeech =
+            '🎙️ Đang thu giọng nói tiếng Việt... Nói xong bấm "Gửi ngay" hoặc "Chuyển chữ"';
+      });
+
+      final stream = await _audioRecorder.startStream(
+        const RecordConfig(
+          encoder: AudioEncoder.pcm16bits,
+          sampleRate: 16000,
+          numChannels: 1,
+          autoGain: true,
+          echoCancel: true,
+          noiseSuppress: true,
+          androidConfig: AndroidRecordConfig(
+            manageBluetooth: false,
+            audioSource: AndroidAudioSource.voiceRecognition,
+          ),
+        ),
+      );
+
+      _directRecordSub = stream.listen(
+        (Uint8List chunk) {
+          if (!_isRecordingDirectAudio || !mounted) return;
+          _pcmBuffer.add(chunk);
+
+          // Measure peak 16-bit signed PCM amplitude for adaptive voice activity detection
+          int maxAmp = 0;
+          final byteData = ByteData.sublistView(chunk);
+          for (int i = 0; i + 1 < chunk.length; i += 2) {
+            final sample = byteData.getInt16(i, Endian.little).abs();
+            if (sample > maxAmp) maxAmp = sample;
+          }
+
+          final currentTime = DateTime.now();
+          final elapsedMs = currentTime
+              .difference(_recordStartTime ?? currentTime)
+              .inMilliseconds;
+
+          if (elapsedMs < 350) {
+            // Calibrate ambient noise floor during the first 350ms
+            _noiseFloor = ((_noiseFloor * 2 + maxAmp) ~/ 3).clamp(180, 1800);
+          } else {
+            final threshold = (_noiseFloor * 1.85).round().clamp(420, 3200);
+            if (maxAmp > threshold) {
+              _hasDetectedVoice = true;
+              _lastVoiceTime = currentTime;
+            }
+          }
+
+          final elapsedSec = elapsedMs ~/ 1000;
+          final level = (maxAmp / 6000.0).clamp(0.15, 1.0);
+
+          setState(() {
+            _currentMicLevel = level;
+            _partialSpeech = _hasDetectedVoice
+                ? '🎙️ Đang thu tiếng Việt (${elapsedSec}s)... Ngừng nói 2s tự gửi hoặc bấm "Chuyển chữ"'
+                : '🎙️ Đang nghe (${elapsedSec}s)... Hãy nói câu lệnh đèn hoặc bấm "Chuyển chữ"';
+          });
+
+          // Auto-send after 2.2s of silence once user has spoken (at least 1.5s total recording)
+          if (_hasDetectedVoice &&
+              currentTime
+                      .difference(_lastVoiceTime ?? currentTime)
+                      .inMilliseconds >
+                  2200 &&
+              elapsedMs > 1500) {
+            _stopAndSendDirectAudioRecording();
+          } else if (elapsedSec >= 15) {
+            _stopAndSendDirectAudioRecording();
+          }
+        },
+        onError: (err) {
+          debugPrint('Direct audio recorder error: $err');
+          if (mounted) {
+            setState(() {
+              _isRecordingDirectAudio = false;
+              _isListening = false;
+            });
+          }
+        },
+      );
+    } catch (e) {
+      debugPrint('Failed to start direct audio recording: $e');
+      if (mounted) {
+        setState(() {
+          _isRecordingDirectAudio = false;
+          _isListening = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _stopAndSendDirectAudioRecording({
+    bool insertIntoTextFieldOnly = false,
+  }) async {
+    if (!_isRecordingDirectAudio) return;
+    _isRecordingDirectAudio = false;
+
+    try {
+      await _directRecordSub?.cancel();
+      _directRecordSub = null;
+      await _audioRecorder.stop();
+    } catch (e) {
+      debugPrint('Error stopping audio recorder: $e');
+    }
+
+    final rawPcmBytes = _pcmBuffer.takeBytes();
+    if (!mounted) return;
+
+    setState(() {
+      _isListening = false;
+      _partialSpeech = '';
+    });
+
+    if (rawPcmBytes.length < 3200) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Thời gian ghi âm quá ngắn. Bạn hãy bấm Micro, nói câu hỏi/lệnh rồi bấm "Gửi ngay" nhé!',
+          ),
+          backgroundColor: AppTheme.accentOrange,
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+      return;
+    }
+
+    final aiService = context.read<AiService>();
+    final ledProvider = context.read<LedProvider>();
+
+    if (!aiService.hasApiKey) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Vui lòng nhập Gemini API Key trong mục Cài đặt để chuyển giọng nói tiếng Việt thành văn bản trên thiết bị này.',
+          ),
+          backgroundColor: AppTheme.accentOrange,
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+      return;
+    }
+
+    final normalizedPcm = _normalizePcm16(rawPcmBytes);
+    final wavBytes = _buildWavBytes(normalizedPcm, sampleRate: 16000);
+
+    // Mode 1: Transcribe Vietnamese speech directly into the text input field
+    if (insertIntoTextFieldOnly) {
+      setState(() => _isLoading = true);
+      final text = await aiService.transcribeAudioOnly(wavBytes);
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+
+      if (text != null && text.trim().isNotEmpty) {
+        setState(() {
+          _controller.text = text.trim();
+          _controller.selection = TextSelection.fromPosition(
+            TextPosition(offset: _controller.text.length),
+          );
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              'Không nghe rõ giọng nói tiếng Việt. Bạn hãy nói to và rõ hơn gần micro nhé!',
+            ),
+            backgroundColor: AppTheme.accentOrange,
+            behavior: SnackBarBehavior.floating,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+      }
+      return;
+    }
+
+    // Mode 2: Transcribe + process voice command immediately
+    final userMsgId = _uuid.v4();
+    _animatedMessageIds.add(userMsgId);
+
+    setState(() {
+      _messages.add(ChatMessage(
+        id: userMsgId,
+        content: '🎙️ Đang nhận diện giọng nói tiếng Việt...',
+        isUser: true,
+        timestamp: DateTime.now(),
+      ));
+      _isLoading = true;
+    });
+    _scrollToBottom();
+
+    final deviceContext = ledProvider.buildStateContextSummary();
+    final result = await aiService.processAudioCommand(
+      wavBytes,
+      deviceContext: deviceContext,
+    );
+
+    if (!mounted) return;
+
+    final rawTranscript = (result?['transcript'] as String?)?.trim() ?? '';
+    final replyText = (result?['response'] as String?)?.trim() ?? '';
+    final rawCommands = result?['commands'] as List<dynamic>?;
+    final hasValidReply =
+        rawTranscript.isNotEmpty ||
+        replyText.isNotEmpty ||
+        (rawCommands != null && rawCommands.isNotEmpty);
+
+    if (result == null || !hasValidReply) {
+      setState(() {
+        _messages.removeWhere((m) => m.id == userMsgId);
+        _isLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Không nghe rõ giọng nói tiếng Việt. Bạn hãy nói to và rõ hơn gần micro nhé!',
+          ),
+          backgroundColor: AppTheme.accentOrange,
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+      return;
+    }
+
+    final transcript = rawTranscript.isNotEmpty
+        ? rawTranscript
+        : '🎙️ [Lệnh giọng nói tiếng Việt]';
+    final finalReply =
+        replyText.isNotEmpty ? replyText : 'Đã thực hiện lệnh giọng nói của bạn.';
+    final modelUsed =
+        (result['modelUsed'] as String?) ?? aiService.lastUsedModel;
+    final commands = rawCommands != null
+        ? rawCommands.map((e) => Map<String, dynamic>.from(e as Map)).toList()
+        : (result['command'] != null
+            ? [Map<String, dynamic>.from(result['command'] as Map)]
+            : <Map<String, dynamic>>[]);
+
+    if (commands.isNotEmpty) {
+      ledProvider.executeCommands(commands);
+    }
+
+    final aiMsgId = _uuid.v4();
+    setState(() {
+      final userIdx = _messages.indexWhere((m) => m.id == userMsgId);
+      if (userIdx != -1) {
+        _messages[userIdx] = ChatMessage(
+          id: userMsgId,
+          content: transcript,
+          isUser: true,
+          timestamp: _messages[userIdx].timestamp,
+        );
+      }
+      _messages.add(ChatMessage(
+        id: aiMsgId,
+        content: finalReply,
+        isUser: false,
+        timestamp: DateTime.now(),
+        command: commands.isNotEmpty ? commands.first : null,
+        commands: commands,
+        shouldAnimate: true,
+        modelUsed: modelUsed,
+      ));
+      _isLoading = false;
+    });
+
+    _scrollToBottom();
+
+    if (_voiceEnabled) {
+      await _speakText(aiMsgId, finalReply);
+    }
+  }
+
+  /// Normalizes 16-bit Little-Endian PCM audio:
+  /// - Ensures even byte length (2-byte sample alignment)
+  /// - Removes DC offset
+  /// - Applies automatic digital gain (up to 8x) so quiet microphones are crystal clear for STT
+  Uint8List _normalizePcm16(Uint8List rawBytes) {
+    final alignedLength = rawBytes.length & ~1;
+    if (alignedLength < 4) return rawBytes;
+
+    final numSamples = alignedLength ~/ 2;
+    final inData = ByteData.sublistView(rawBytes, 0, alignedLength);
+
+    int sum = 0;
+    for (int i = 0; i < alignedLength; i += 2) {
+      sum += inData.getInt16(i, Endian.little);
+    }
+    final dcOffset = sum ~/ numSamples;
+
+    int peak = 0;
+    for (int i = 0; i < alignedLength; i += 2) {
+      final centered = (inData.getInt16(i, Endian.little) - dcOffset).abs();
+      if (centered > peak) peak = centered;
+    }
+
+    if (peak < 80) {
+      return Uint8List.sublistView(rawBytes, 0, alignedLength);
+    }
+
+    // Target peak ~24000 out of 32767 (-2.7 dBFS), max boost 8.0x
+    final gain = (24000.0 / peak).clamp(1.0, 8.0);
+    final outBytes = Uint8List(alignedLength);
+    final outData = ByteData.sublistView(outBytes);
+
+    for (int i = 0; i < alignedLength; i += 2) {
+      final centered = inData.getInt16(i, Endian.little) - dcOffset;
+      final amplified = (centered * gain).round().clamp(-32767, 32767);
+      outData.setInt16(i, amplified, Endian.little);
+    }
+    return outBytes;
+  }
+
+  /// Wraps raw 16-bit Mono PCM bytes in a standard 44-byte RIFF WAV header
+  Uint8List _buildWavBytes(
+    Uint8List pcmBytes, {
+    int sampleRate = 16000,
+    int numChannels = 1,
+    int bitsPerSample = 16,
+  }) {
+    final byteRate = sampleRate * numChannels * (bitsPerSample ~/ 8);
+    final blockAlign = numChannels * (bitsPerSample ~/ 8);
+    final dataLength = pcmBytes.length;
+    final totalLength = 44 + dataLength;
+
+    final header = ByteData(44);
+    // "RIFF"
+    header.setUint8(0, 0x52);
+    header.setUint8(1, 0x49);
+    header.setUint8(2, 0x46);
+    header.setUint8(3, 0x46);
+    header.setUint32(4, 36 + dataLength, Endian.little);
+    // "WAVE"
+    header.setUint8(8, 0x57);
+    header.setUint8(9, 0x41);
+    header.setUint8(10, 0x56);
+    header.setUint8(11, 0x45);
+    // "fmt "
+    header.setUint8(12, 0x66);
+    header.setUint8(13, 0x6D);
+    header.setUint8(14, 0x74);
+    header.setUint8(15, 0x20);
+    header.setUint32(16, 16, Endian.little); // PCM chunk size
+    header.setUint16(20, 1, Endian.little); // AudioFormat = 1 (PCM)
+    header.setUint16(22, numChannels, Endian.little);
+    header.setUint32(24, sampleRate, Endian.little);
+    header.setUint32(28, byteRate, Endian.little);
+    header.setUint16(32, blockAlign, Endian.little);
+    header.setUint16(34, bitsPerSample, Endian.little);
+    // "data"
+    header.setUint8(36, 0x64);
+    header.setUint8(37, 0x61);
+    header.setUint8(38, 0x74);
+    header.setUint8(39, 0x61);
+    header.setUint32(40, dataLength, Endian.little);
+
+    final wav = Uint8List(totalLength);
+    wav.setRange(0, 44, header.buffer.asUint8List());
+    wav.setRange(44, totalLength, pcmBytes);
+    return wav;
+  }
+
+  Future<void> _startDeviceListening() async {
+    try {
+      if (!_speechAvailable) {
+        _speechAvailable = await _speech.initialize(
+          options: [
+            SpeechToText.androidIntentLookup,
+            SpeechToText.androidNoBluetooth,
+          ],
+          onStatus: (status) {
+            if ((status == 'done' || status == 'notListening') && mounted) {
+              if (!_isRecordingDirectAudio) {
+                setState(() => _isListening = false);
+              }
+            }
+          },
+          onError: (error) {
+            debugPrint('Speech recognition error: $error');
+            if (mounted && !_isRecordingDirectAudio) {
+              setState(() => _isListening = false);
+            }
+          },
+        );
+      }
+
+      if (!_speechAvailable) {
+        // Fallback to direct hardware microphone recorder if SpeechRecognizer is unavailable
+        await _startDirectAudioRecording();
         return;
       }
 
@@ -393,7 +825,7 @@ class _AiChatScreenState extends State<AiChatScreen>
           localeId: 'vi_VN',
           listenFor: const Duration(seconds: 15),
           pauseFor: const Duration(seconds: 2),
-          listenMode: ListenMode.confirmation,
+          listenMode: ListenMode.dictation,
           cancelOnError: false,
           partialResults: true,
         ),
@@ -414,10 +846,8 @@ class _AiChatScreenState extends State<AiChatScreen>
         },
       );
     } catch (e) {
-      debugPrint('Error starting speech recognition: $e');
-      if (mounted) {
-        setState(() => _isListening = false);
-      }
+      debugPrint('Error starting speech recognition, falling back to audio recorder: $e');
+      await _startDirectAudioRecording();
     }
   }
 
@@ -429,7 +859,12 @@ class _AiChatScreenState extends State<AiChatScreen>
     final ledProvider = context.read<LedProvider>();
 
     if (_isListening) {
-      if (_isUsingWyoming) {
+      if (_isRecordingDirectAudio) {
+        _isRecordingDirectAudio = false;
+        await _directRecordSub?.cancel();
+        _directRecordSub = null;
+        await _audioRecorder.stop();
+      } else if (_isUsingWyoming) {
         await _wyomingStt.cancelListening();
       } else {
         await _speech.stop();
@@ -718,22 +1153,30 @@ class _AiChatScreenState extends State<AiChatScreen>
                                         children: [
                                           Row(
                                             children: [
-                                              Text(
-                                                m.name,
-                                                style: TextStyle(
-                                                  fontWeight: FontWeight.w700,
-                                                  fontSize: 13,
-                                                  color: isCurrent
-                                                      ? AppTheme.accentCyan
-                                                      : AppTheme.textPrimary,
+                                              Flexible(
+                                                child: Text(
+                                                  m.name,
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.w700,
+                                                    fontSize: 13,
+                                                    color: isCurrent
+                                                        ? AppTheme.accentCyan
+                                                        : AppTheme.textPrimary,
+                                                  ),
                                                 ),
                                               ),
                                               const SizedBox(width: 6),
-                                              Text(
-                                                '(${m.id})',
-                                                style: const TextStyle(
-                                                  fontSize: 11,
-                                                  color: AppTheme.textSecondary,
+                                              Flexible(
+                                                child: Text(
+                                                  '(${m.id})',
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: const TextStyle(
+                                                    fontSize: 11,
+                                                    color: AppTheme.textSecondary,
+                                                  ),
                                                 ),
                                               ),
                                             ],
@@ -794,6 +1237,28 @@ class _AiChatScreenState extends State<AiChatScreen>
     );
   }
 
+  Future<void> _cancelListening() async {
+    try {
+      if (_isRecordingDirectAudio) {
+        _isRecordingDirectAudio = false;
+        await _directRecordSub?.cancel();
+        _directRecordSub = null;
+        await _audioRecorder.stop();
+        _pcmBuffer.clear();
+      } else if (_isUsingWyoming) {
+        await _wyomingStt.cancelListening();
+      } else {
+        await _speech.stop();
+      }
+    } catch (_) {}
+    if (mounted) {
+      setState(() {
+        _isListening = false;
+        _partialSpeech = '';
+      });
+    }
+  }
+
   void _scrollToBottom() {
     Future.delayed(const Duration(milliseconds: 80), () {
       if (_scrollController.hasClients) {
@@ -812,211 +1277,24 @@ class _AiChatScreenState extends State<AiChatScreen>
     final ledProvider = context.watch<LedProvider>();
     final ledState = ledProvider.ledState;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-    final bottomPad = bottomInset > 0 ? 8.0 : 86.0;
+    final isKeyboardOpen = bottomInset > 0;
+    final bottomPad = isKeyboardOpen ? 8.0 : 86.0;
 
     return SafeArea(
       child: Column(
         children: [
-          // 3D Liquid Glass Header Capsule
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
-            child: LiquidGlassCard(
-              borderRadius: 20,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              child: Row(
-                children: [
-                  AnimatedBuilder(
-                    animation: _waveController,
-                    builder: (context, child) {
-                      final active = _isSpeaking || _isListening;
-                      return Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          gradient: _isListening
-                              ? AppTheme.warmGradient
-                              : AppTheme.primaryGradient,
-                          borderRadius: BorderRadius.circular(13),
-                          boxShadow: active
-                              ? [
-                                  BoxShadow(
-                                    color: (_isListening
-                                            ? AppTheme.accentRed
-                                            : AppTheme.accentCyan)
-                                        .withValues(
-                                            alpha: 0.35 + _waveController.value * 0.35),
-                                    blurRadius: 14 + _waveController.value * 8,
-                                    spreadRadius: 1 + _waveController.value * 2,
-                                  ),
-                                ]
-                              : null,
-                        ),
-                        child: Icon(
-                          _isListening
-                              ? Icons.mic_rounded
-                              : _isSpeaking
-                                  ? Icons.graphic_eq_rounded
-                                  : Icons.smart_toy_rounded,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: _showModelSelectorSheet,
-                      behavior: HitTestBehavior.opaque,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Flexible(
-                                child: Text(
-                                  'Smart LED Agent',
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 15,
-                                    letterSpacing: -0.3,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.accentCyan.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(
-                                    color: AppTheme.accentCyan.withValues(alpha: 0.35),
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(
-                                      Icons.sync_rounded,
-                                      size: 11,
-                                      color: AppTheme.accentCyan,
-                                    ),
-                                    const SizedBox(width: 3),
-                                    Text(
-                                      aiService.currentModelId,
-                                      style: const TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w700,
-                                        color: AppTheme.accentCyan,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 2),
-                          Row(
-                            children: [
-                              Container(
-                                width: 7,
-                                height: 7,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: _isListening
-                                      ? AppTheme.accentRed
-                                      : _isSpeaking
-                                          ? AppTheme.accentCyan
-                                          : aiService.hasApiKey
-                                              ? AppTheme.accentGreen
-                                              : AppTheme.accentOrange,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: Text(
-                                  _isListening
-                                      ? 'Đang nghe câu hỏi về đèn...'
-                                      : _isSpeaking
-                                          ? 'Agent đang nói & đồng bộ đèn...'
-                                          : _isLoading
-                                              ? 'Đang xử lý (${aiService.currentModelId})...'
-                                              : 'Chuyên gia Đèn LED • 9 model xoay vòng',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: _isListening
-                                        ? AppTheme.accentRed
-                                        : _isSpeaking
-                                            ? AppTheme.accentCyan
-                                            : aiService.hasApiKey
-                                                ? AppTheme.accentGreen
-                                                : AppTheme.accentOrange,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  // Model rotation button
-                  _GlassIconButton(
-                    tooltip: 'Chọn / Xoay vòng Model Gemini',
-                    onTap: _showModelSelectorSheet,
-                    icon: Icons.autorenew_rounded,
-                    iconColor: AppTheme.accentCyan,
-                  ),
-                  const SizedBox(width: 6),
-                  // Voice toggle button
-                  _GlassIconButton(
-                    tooltip: _voiceEnabled
-                        ? (_vieneuEnabled
-                            ? 'VieNeu-TTS 48kHz ($_vieneuVoice)'
-                            : 'Đang bật giọng nói AI')
-                        : 'Giọng nói AI đang tắt',
-                    onTap: _toggleVoiceEnabled,
-                    icon: _voiceEnabled
-                        ? (_vieneuEnabled
-                            ? Icons.record_voice_over_rounded
-                            : Icons.volume_up_rounded)
-                        : Icons.volume_off_rounded,
-                    iconColor: _voiceEnabled
-                        ? (_vieneuEnabled
-                            ? AppTheme.accentPurple
-                            : AppTheme.accentCyan)
-                        : AppTheme.textSecondary,
-                    badgeDot: _voiceEnabled && _vieneuEnabled,
-                    badgeColor: AppTheme.accentPurple,
-                  ),
-                  const SizedBox(width: 6),
-                  // Reset chat button
-                  _GlassIconButton(
-                    tooltip: 'Làm mới hội thoại',
-                    onTap: _resetChat,
-                    icon: Icons.refresh_rounded,
-                    iconColor: AppTheme.textSecondary,
-                  ),
-                ],
-              ),
-            ),
-          ),
+          // Unified Compact Header + Quick LED Status
+          _buildUnifiedHeader(aiService, ledProvider, ledState),
 
-          // Live LED Status & Direct Control Strip inside AI Chat
-          _buildLiveLedBar(ledProvider, ledState),
+          // Expandable Quick LED Control Drawer (only visible when toggled and keyboard closed)
+          if (_showQuickControls && !isKeyboardOpen)
+            _buildExpandableLedDrawer(ledProvider, ledState),
 
-          // Messages
+          // Chat Messages List
           Expanded(
             child: ListView.builder(
               controller: _scrollController,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.fromLTRB(14, 6, 14, 10),
               itemCount: _messages.length + (_isLoading ? 1 : 0),
               itemBuilder: (context, index) {
                 if (index == _messages.length) {
@@ -1049,123 +1327,37 @@ class _AiChatScreenState extends State<AiChatScreen>
             ),
           ),
 
-          // Active listening banner
+          // Active Voice Recording Bar OR Quick Suggestion Chips
           if (_isListening)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              child: LiquidGlassCard(
-                borderRadius: 16,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                tintColor: _isUsingWyoming ? AppTheme.accentCyan : AppTheme.accentRed,
-                child: Row(
-                  children: [
-                    Icon(
-                      _isUsingWyoming
-                          ? Icons.mic_external_on_rounded
-                          : Icons.graphic_eq_rounded,
-                      color: _isUsingWyoming
-                          ? AppTheme.accentCyan
-                          : AppTheme.accentRed,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        _partialSpeech.isEmpty
-                            ? (_isUsingWyoming
-                                ? 'Đang nghe bằng Wyoming Vietnamese STT... (Bấm Xong để gửi)'
-                                : 'Hãy đặt câu hỏi về đèn hoặc nói lệnh điều khiển...')
-                            : _partialSpeech,
-                        style: const TextStyle(
-                          color: AppTheme.textPrimary,
-                          fontSize: 13,
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: _toggleListening,
-                      style: TextButton.styleFrom(
-                        foregroundColor: _isUsingWyoming
-                            ? AppTheme.accentCyan
-                            : AppTheme.accentRed,
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        minimumSize: const Size(0, 28),
-                      ),
-                      child: Text(
-                        _isUsingWyoming ? 'Xong' : 'Gửi ngay',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            _buildVoiceRecordingBar()
+          else if (!isKeyboardOpen)
+            _buildQuickChipsRow(),
 
-          // Quick LED Q&A and Control chips
-          SizedBox(
-            height: 38,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              children: [
-                _QuickChip(
-                  label: '❓ Đèn đang trạng thái gì?',
-                  onTap: () => _sendMessage(
-                    'Cho mình hỏi đèn hiện tại đang màu gì, độ sáng bao nhiêu và cảm biến báo thế nào?',
-                  ),
-                ),
-                _QuickChip(
-                  label: '❓ Đèn có mấy hiệu ứng?',
-                  onTap: () => _sendMessage(
-                    'Hệ thống đèn LED này có những hiệu ứng nào và chế độ tự động hoạt động ra sao?',
-                  ),
-                ),
-                _QuickChip(
-                  label: '📚 Đèn học bài',
-                  onTap: () => _sendMessage(
-                    'Chỉnh đèn sáng trắng mát tập trung để mình học bài',
-                  ),
-                ),
-                _QuickChip(
-                  label: '🔆 Tăng sáng thêm',
-                  onTap: () =>
-                      _sendMessage('Hơi tối, tăng độ sáng đèn lên thêm chút đi'),
-                ),
-                _QuickChip(
-                  label: '🔅 Giảm sáng bớt',
-                  onTap: () => _sendMessage(
-                    'Hơi chói mắt, giảm độ sáng đèn xuống giúp mình',
-                  ),
-                ),
-                _QuickChip(
-                  label: '🌈 Hiệu ứng cầu vồng',
-                  onTap: () => _sendMessage('Cho đèn chạy hiệu ứng cầu vồng'),
-                ),
-                _QuickChip(
-                  label: '🌙 Đèn ngủ ấm 20%',
-                  onTap: () => _sendMessage(
-                    'Bật đèn ngủ màu vàng ấm độ sáng 20%',
-                  ),
-                ),
-                _QuickChip(
-                  label: '⏹️ Tắt đèn',
-                  onTap: () => _sendMessage('Tắt đèn đi giúp mình'),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 6),
-
-          // 3D Liquid Glass Floating Input Capsule
+          // Sleek Floating Input Capsule
           Padding(
-            padding: EdgeInsets.fromLTRB(16, 4, 16, bottomPad),
-            child: LiquidGlassCard(
-              borderRadius: 30,
-              padding: const EdgeInsets.all(6),
+            padding: EdgeInsets.fromLTRB(14, 6, 14, bottomPad),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFF111827).withValues(alpha: 0.92),
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(
+                  color: _isListening
+                      ? AppTheme.accentRed.withValues(alpha: 0.65)
+                      : Colors.white.withValues(alpha: 0.14),
+                  width: 1.2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.35),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
               child: Row(
                 children: [
-                  // Microphone button for STT
+                  // Voice Microphone Button
                   GestureDetector(
                     onTap: _isLoading ? null : _toggleListening,
                     child: AnimatedContainer(
@@ -1175,54 +1367,42 @@ class _AiChatScreenState extends State<AiChatScreen>
                       decoration: BoxDecoration(
                         gradient: _isListening
                             ? AppTheme.warmGradient
-                            : (_wyomingConfigured
-                                ? const LinearGradient(
-                                    colors: [Color(0xFF00F2FE), Color(0xFF4FACFE)],
-                                  )
-                                : null),
-                        color: (_isListening || _wyomingConfigured)
-                            ? null
-                            : Colors.white.withValues(alpha: 0.08),
+                            : const LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  Color(0xFF1E293B),
+                                  Color(0xFF0F172A),
+                                ],
+                              ),
                         shape: BoxShape.circle,
                         border: Border.all(
                           color: _isListening
-                              ? Colors.white.withValues(alpha: 0.6)
-                              : (_wyomingConfigured
-                                  ? AppTheme.accentCyan.withValues(alpha: 0.6)
-                                  : Colors.white.withValues(alpha: 0.2)),
+                              ? Colors.white.withValues(alpha: 0.7)
+                              : AppTheme.accentCyan.withValues(alpha: 0.45),
                           width: 1.2,
                         ),
                         boxShadow: _isListening
                             ? [
                                 BoxShadow(
-                                  color: AppTheme.accentRed.withValues(alpha: 0.5),
-                                  blurRadius: 14,
-                                  spreadRadius: 2,
+                                  color:
+                                      AppTheme.accentRed.withValues(alpha: 0.5),
+                                  blurRadius: 12,
+                                  spreadRadius: 1,
                                 ),
                               ]
-                            : (_wyomingConfigured
-                                ? [
-                                    BoxShadow(
-                                      color: AppTheme.accentCyan.withValues(alpha: 0.35),
-                                      blurRadius: 10,
-                                    ),
-                                  ]
-                                : null),
+                            : null,
                       ),
                       child: Icon(
-                        _isListening
-                            ? Icons.stop_rounded
-                            : (_wyomingConfigured
-                                ? Icons.mic_external_on_rounded
-                                : Icons.mic_rounded),
-                        color: (_isListening || _wyomingConfigured)
-                            ? Colors.white
-                            : AppTheme.textPrimary,
-                        size: 20,
+                        _isListening ? Icons.stop_rounded : Icons.mic_rounded,
+                        color:
+                            _isListening ? Colors.white : AppTheme.accentCyan,
+                        size: 21,
                       ),
                     ),
                   ),
                   const SizedBox(width: 8),
+                  // Text Input Field
                   Expanded(
                     child: TextField(
                       controller: _controller,
@@ -1232,15 +1412,16 @@ class _AiChatScreenState extends State<AiChatScreen>
                       ),
                       decoration: InputDecoration(
                         hintText: _isListening
-                            ? 'Đang nghe câu hỏi về đèn...'
-                            : 'Hỏi về đèn hoặc ra lệnh điều khiển...',
+                            ? 'Đang thu giọng nói tiếng Việt...'
+                            : 'Nhắn tin hoặc chạm 🎙️ để nói...',
                         hintStyle: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.35),
-                          fontSize: 13,
+                          color: Colors.white.withValues(alpha: 0.38),
+                          fontSize: 13.5,
                         ),
                         border: InputBorder.none,
+                        isDense: true,
                         contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 8,
+                          horizontal: 6,
                           vertical: 10,
                         ),
                       ),
@@ -1249,7 +1430,7 @@ class _AiChatScreenState extends State<AiChatScreen>
                     ),
                   ),
                   const SizedBox(width: 6),
-                  // 3D Send Button
+                  // Send Button
                   GestureDetector(
                     onTap: _isLoading ? null : () => _sendMessage(),
                     child: Container(
@@ -1258,21 +1439,19 @@ class _AiChatScreenState extends State<AiChatScreen>
                       decoration: BoxDecoration(
                         gradient: AppTheme.primaryGradient,
                         shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.4),
-                          width: 1.2,
-                        ),
                         boxShadow: [
                           BoxShadow(
-                            color: AppTheme.accentCyan.withValues(alpha: 0.35),
+                            color: AppTheme.accentCyan.withValues(alpha: 0.3),
                             blurRadius: 10,
                           ),
                         ],
                       ),
                       child: Icon(
-                        _isLoading ? Icons.hourglass_top : Icons.arrow_upward_rounded,
+                        _isLoading
+                            ? Icons.hourglass_top_rounded
+                            : Icons.send_rounded,
                         color: Colors.white,
-                        size: 20,
+                        size: 19,
                       ),
                     ),
                   ),
@@ -1285,225 +1464,508 @@ class _AiChatScreenState extends State<AiChatScreen>
     );
   }
 
-  Widget _buildLiveLedBar(LedProvider ledProvider, LedState ledState) {
+  Widget _buildUnifiedHeader(
+    AiService aiService,
+    LedProvider ledProvider,
+    LedState ledState,
+  ) {
     final isOn = ledState.isOn;
-    final color = ledState.color;
+    final ledColor = ledState.color;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      padding: const EdgeInsets.fromLTRB(14, 6, 14, 6),
       child: LiquidGlassCard(
-        borderRadius: 18,
-        tintColor: isOn ? color : null,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        child: Column(
+        borderRadius: 20,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
           children: [
-            Row(
-              children: [
-                // Live glowing bulb icon
-                GestureDetector(
-                  onTap: () => ledProvider.togglePower(!isOn),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 250),
-                    width: 36,
-                    height: 36,
+            // Animated AI / Voice Avatar
+            AnimatedBuilder(
+              animation: _waveController,
+              builder: (context, child) {
+                final active = _isSpeaking || _isListening;
+                return GestureDetector(
+                  onTap: _showModelSelectorSheet,
+                  child: Container(
+                    width: 38,
+                    height: 38,
                     decoration: BoxDecoration(
-                      color: isOn ? color.withValues(alpha: 0.25) : Colors.white.withValues(alpha: 0.05),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: isOn ? color : Colors.white.withValues(alpha: 0.2),
-                        width: 1.5,
-                      ),
-                      boxShadow: isOn
+                      gradient: _isListening
+                          ? AppTheme.warmGradient
+                          : AppTheme.primaryGradient,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: active
                           ? [
                               BoxShadow(
-                                color: color.withValues(alpha: 0.5),
-                                blurRadius: 12,
-                                spreadRadius: 2,
+                                color: (_isListening
+                                        ? AppTheme.accentRed
+                                        : AppTheme.accentCyan)
+                                    .withValues(
+                                  alpha: 0.3 + _waveController.value * 0.35,
+                                ),
+                                blurRadius: 12 + _waveController.value * 6,
                               ),
                             ]
                           : null,
                     ),
                     child: Icon(
+                      _isListening
+                          ? Icons.mic_rounded
+                          : _isSpeaking
+                              ? Icons.graphic_eq_rounded
+                              : Icons.auto_awesome_rounded,
+                      color: Colors.white,
+                      size: 19,
+                    ),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(width: 10),
+
+            // Title & Model Selector Pill
+            Expanded(
+              child: GestureDetector(
+                onTap: _showModelSelectorSheet,
+                behavior: HitTestBehavior.opaque,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Trợ Lý AI Đèn LED',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14.5,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: _isListening
+                                ? AppTheme.accentRed
+                                : _isSpeaking
+                                    ? AppTheme.accentCyan
+                                    : AppTheme.accentGreen,
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        Flexible(
+                          child: Text(
+                            _isListening
+                                ? 'Đang nghe tiếng Việt...'
+                                : _isSpeaking
+                                    ? 'Đang phát giọng nói...'
+                                    : aiService.currentModelId,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: _isListening
+                                  ? AppTheme.accentRed
+                                  : AppTheme.accentCyan,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 2),
+                        const Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          size: 14,
+                          color: AppTheme.accentCyan,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Compact Live LED Status Pill (Tap to open quick controls, Long-press to toggle power)
+            GestureDetector(
+              onTap: () =>
+                  setState(() => _showQuickControls = !_showQuickControls),
+              onLongPress: () => ledProvider.togglePower(!isOn),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 220),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: isOn
+                      ? ledColor.withValues(alpha: 0.18)
+                      : Colors.white.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isOn
+                        ? ledColor.withValues(alpha: 0.7)
+                        : Colors.white.withValues(alpha: 0.15),
+                    width: 1.2,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
                       isOn
                           ? Icons.lightbulb_rounded
                           : Icons.lightbulb_outline_rounded,
-                      color: isOn ? color : AppTheme.textSecondary,
-                      size: 20,
+                      size: 15,
+                      color: isOn ? ledColor : AppTheme.textSecondary,
                     ),
-                  ),
+                    const SizedBox(width: 5),
+                    Text(
+                      isOn ? '${ledState.brightness}%' : 'TẮT',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: isOn
+                            ? AppTheme.textPrimary
+                            : AppTheme.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(width: 2),
+                    Icon(
+                      _showQuickControls
+                          ? Icons.expand_less_rounded
+                          : Icons.expand_more_rounded,
+                      size: 14,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () =>
-                        setState(() => _showQuickControls = !_showQuickControls),
-                    behavior: HitTestBehavior.opaque,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+              ),
+            ),
+            const SizedBox(width: 6),
+
+            // Voice Toggle Button
+            _GlassIconButton(
+              tooltip: _voiceEnabled
+                  ? 'Đang bật đọc tiếng Việt'
+                  : 'Đang tắt giọng đọc AI',
+              onTap: _toggleVoiceEnabled,
+              icon: _voiceEnabled
+                  ? Icons.volume_up_rounded
+                  : Icons.volume_off_rounded,
+              iconColor:
+                  _voiceEnabled ? AppTheme.accentCyan : AppTheme.textSecondary,
+            ),
+            const SizedBox(width: 6),
+
+            // Reset Chat Button
+            _GlassIconButton(
+              tooltip: 'Làm mới hội thoại',
+              onTap: _resetChat,
+              icon: Icons.refresh_rounded,
+              iconColor: AppTheme.textSecondary,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExpandableLedDrawer(
+    LedProvider ledProvider,
+    LedState ledState,
+  ) {
+    final isOn = ledState.isOn;
+    final color = ledState.color;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 0, 14, 6),
+      child: LiquidGlassCard(
+        borderRadius: 16,
+        tintColor: isOn ? color : null,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                GestureDetector(
+                  onTap: () => ledProvider.togglePower(!isOn),
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: isOn
+                          ? AppTheme.accentGreen.withValues(alpha: 0.2)
+                          : Colors.white.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: isOn
+                            ? AppTheme.accentGreen
+                            : Colors.white.withValues(alpha: 0.2),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Row(
-                          children: [
-                            Text(
-                              isOn ? 'Đèn đang BẬT' : 'Đèn đang TẮT',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 13,
-                                color: isOn
-                                    ? AppTheme.textPrimary
-                                    : AppTheme.textSecondary,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            if (ledProvider.autoMode)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 1,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.accentCyan.withValues(alpha: 0.2),
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(
-                                    color: AppTheme.accentCyan.withValues(alpha: 0.4),
-                                  ),
-                                ),
-                                child: const Text(
-                                  'AUTO',
-                                  style: TextStyle(
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppTheme.accentCyan,
-                                  ),
-                                ),
-                              ),
-                          ],
+                        Icon(
+                          Icons.power_settings_new_rounded,
+                          size: 14,
+                          color: isOn
+                              ? AppTheme.accentGreen
+                              : AppTheme.textSecondary,
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(width: 4),
                         Text(
-                          'Độ sáng: ${ledState.brightness}% • ${ledState.effect.icon} ${ledState.effect.displayName}',
-                          style: const TextStyle(
+                          isOn ? 'Đang BẬT' : 'Đang TẮT',
+                          style: TextStyle(
                             fontSize: 11,
-                            color: AppTheme.textSecondary,
+                            fontWeight: FontWeight.w700,
+                            color: isOn
+                                ? AppTheme.accentGreen
+                                : AppTheme.textSecondary,
                           ),
                         ),
                       ],
                     ),
                   ),
                 ),
-                IconButton(
-                  tooltip: 'Mở bảng chỉnh nhanh',
-                  visualDensity: VisualDensity.compact,
-                  onPressed: () =>
-                      setState(() => _showQuickControls = !_showQuickControls),
-                  icon: Icon(
-                    _showQuickControls
-                        ? Icons.expand_less_rounded
-                        : Icons.tune_rounded,
-                    size: 18,
-                    color: AppTheme.textSecondary,
+                const SizedBox(width: 8),
+                const Icon(
+                  Icons.brightness_6_rounded,
+                  size: 15,
+                  color: AppTheme.accentOrange,
+                ),
+                Expanded(
+                  child: SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      trackHeight: 4,
+                      thumbShape: const RoundSliderThumbShape(
+                        enabledThumbRadius: 7,
+                      ),
+                      overlayShape: const RoundSliderOverlayShape(
+                        overlayRadius: 12,
+                      ),
+                      activeTrackColor: AppTheme.accentCyan,
+                      thumbColor: Colors.white,
+                    ),
+                    child: Slider(
+                      value: ledState.brightness.toDouble(),
+                      min: 0,
+                      max: 100,
+                      onChanged: (v) => ledProvider.setBrightness(v.toInt()),
+                    ),
                   ),
                 ),
-                Transform.scale(
-                  scale: 0.8,
-                  child: Switch(
-                    value: isOn,
-                    onChanged: (v) => ledProvider.togglePower(v),
-                    activeThumbColor: AppTheme.accentCyan,
+                Text(
+                  '${ledState.brightness}%',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.accentCyan,
                   ),
                 ),
               ],
             ),
-            if (_showQuickControls) ...[
-              const Divider(color: Colors.white12, height: 16),
-              Row(
+            const SizedBox(height: 6),
+            SizedBox(
+              height: 26,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
                 children: [
-                  const Icon(
-                    Icons.brightness_6_rounded,
-                    size: 16,
-                    color: AppTheme.accentOrange,
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: SliderTheme(
-                      data: SliderTheme.of(context).copyWith(
-                        trackHeight: 4,
-                        thumbShape: const RoundSliderThumbShape(
-                          enabledThumbRadius: 7,
-                        ),
-                        overlayShape: const RoundSliderOverlayShape(
-                          overlayRadius: 14,
-                        ),
-                        activeTrackColor: AppTheme.accentCyan,
-                        thumbColor: Colors.white,
-                      ),
-                      child: Slider(
-                        value: ledState.brightness.toDouble(),
-                        min: 0,
-                        max: 100,
-                        onChanged: (v) => ledProvider.setBrightness(v.toInt()),
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    width: 36,
-                    child: Text(
-                      '${ledState.brightness}%',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.accentCyan,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              SizedBox(
-                height: 28,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  children: [
-                    for (final preset in const [
-                      Color(0xFFFFFFFF),
-                      Color(0xFFFFB464),
-                      Color(0xFFFF007A),
-                      Color(0xFF00F2FE),
-                      Color(0xFF10B981),
-                      Color(0xFFA855F7),
-                      Color(0xFFF59E0B),
-                      Color(0xFF0066FF),
-                    ])
-                      GestureDetector(
-                        onTap: () {
-                          if (!ledState.isOn) ledProvider.togglePower(true);
-                          ledProvider.setColor(preset);
-                        },
-                        child: Container(
-                          width: 26,
-                          height: 26,
-                          margin: const EdgeInsets.only(right: 8),
-                          decoration: BoxDecoration(
-                            color: preset,
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.6),
-                              width: 1.5,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: preset.withValues(alpha: 0.35),
-                                blurRadius: 6,
-                              ),
-                            ],
+                  for (final preset in const [
+                    Color(0xFFFFFFFF),
+                    Color(0xFFFFB464),
+                    Color(0xFFFF007A),
+                    Color(0xFF00F2FE),
+                    Color(0xFF10B981),
+                    Color(0xFFA855F7),
+                    Color(0xFFF59E0B),
+                    Color(0xFF0066FF),
+                  ])
+                    GestureDetector(
+                      onTap: () => ledProvider.setColor(preset),
+                      child: Container(
+                        width: 24,
+                        height: 24,
+                        margin: const EdgeInsets.only(right: 8),
+                        decoration: BoxDecoration(
+                          color: preset,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.65),
+                            width: 1.4,
                           ),
                         ),
                       ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVoiceRecordingBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 4, 14, 4),
+      child: LiquidGlassCard(
+        borderRadius: 18,
+        tintColor: AppTheme.accentRed,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            // Animated Equalizer Wave Bars reactive to mic level
+            AnimatedBuilder(
+              animation: _waveController,
+              builder: (context, _) {
+                final v = _waveController.value;
+                final amp = (0.35 + 0.65 * _currentMicLevel).clamp(0.35, 1.0);
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (final factor in [0.45, 0.9, 0.6, 1.0, 0.5])
+                      Container(
+                        width: 3,
+                        height: 6 + (15 * factor * amp * (0.4 + 0.6 * v)),
+                        margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                        decoration: BoxDecoration(
+                          color: AppTheme.accentRed,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
                   ],
+                );
+              },
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                _partialSpeech.isEmpty
+                    ? '🎙️ Đang nghe tiếng Việt... Hãy nói câu lệnh đèn LED'
+                    : _partialSpeech,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppTheme.textPrimary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            TextButton(
+              onPressed: _cancelListening,
+              style: TextButton.styleFrom(
+                foregroundColor: AppTheme.textSecondary,
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: const Text(
+                'Hủy',
+                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+              ),
+            ),
+            if (_isRecordingDirectAudio) ...[
+              const SizedBox(width: 4),
+              OutlinedButton(
+                onPressed: () => _stopAndSendDirectAudioRecording(
+                  insertIntoTextFieldOnly: true,
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppTheme.accentCyan,
+                  side: BorderSide(
+                    color: AppTheme.accentCyan.withValues(alpha: 0.55),
+                  ),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                ),
+                child: const Text(
+                  'Chuyển chữ',
+                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700),
                 ),
               ),
             ],
+            const SizedBox(width: 4),
+            ElevatedButton(
+              onPressed: _toggleListening,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.accentRed,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: const Text(
+                'Gửi ngay',
+                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700),
+              ),
+            ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildQuickChipsRow() {
+    return SizedBox(
+      height: 38,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        children: [
+          _QuickChip(
+            label: '💡 Bật đèn sáng',
+            onTap: () => _sendMessage('Bật đèn sáng lên giúp mình'),
+          ),
+          _QuickChip(
+            label: '📚 Đèn học bài',
+            onTap: () => _sendMessage(
+              'Chỉnh đèn sáng trắng mát tập trung để mình học bài',
+            ),
+          ),
+          _QuickChip(
+            label: '🌙 Đèn ngủ ấm',
+            onTap: () => _sendMessage('Bật đèn ngủ màu vàng ấm độ sáng 20%'),
+          ),
+          _QuickChip(
+            label: '🌈 Cầu vồng',
+            onTap: () => _sendMessage('Cho đèn chạy hiệu ứng cầu vồng'),
+          ),
+          _QuickChip(
+            label: '🔆 Tăng sáng',
+            onTap: () =>
+                _sendMessage('Hơi tối, tăng độ sáng đèn lên thêm chút đi'),
+          ),
+          _QuickChip(
+            label: '🔅 Giảm sáng',
+            onTap: () =>
+                _sendMessage('Hơi chói mắt, giảm độ sáng đèn xuống giúp mình'),
+          ),
+          _QuickChip(
+            label: '❓ Trạng thái đèn',
+            onTap: () => _sendMessage(
+              'Cho mình hỏi đèn hiện tại đang màu gì, độ sáng bao nhiêu và cảm biến báo thế nào?',
+            ),
+          ),
+          _QuickChip(
+            label: '⏹️ Tắt đèn',
+            onTap: () => _sendMessage('Tắt đèn đi giúp mình'),
+          ),
+        ],
       ),
     );
   }
@@ -1512,36 +1974,43 @@ class _AiChatScreenState extends State<AiChatScreen>
     return Align(
       alignment: Alignment.centerLeft,
       child: Container(
-        margin: const EdgeInsets.only(top: 8, right: 60),
-        child: LiquidGlassCard(
-          borderRadius: 18,
-          blur: 16,
-          tintColor: AppTheme.accentCyan,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: AppTheme.accentCyan,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Flexible(
-                child: Text(
-                  'Smart LED Agent ($currentModel) đang xử lý...',
-                  style: const TextStyle(
-                    color: AppTheme.textPrimary,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
+        margin: const EdgeInsets.only(top: 10, right: 48),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF151F32).withValues(alpha: 0.9),
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(18),
+            topRight: Radius.circular(18),
+            bottomLeft: Radius.circular(6),
+            bottomRight: Radius.circular(18),
           ),
+          border: Border.all(
+            color: AppTheme.accentCyan.withValues(alpha: 0.35),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(
+              width: 15,
+              height: 15,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: AppTheme.accentCyan,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Flexible(
+              child: Text(
+                'AI ($currentModel) đang phản hồi...',
+                style: const TextStyle(
+                  color: AppTheme.textPrimary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1599,8 +2068,8 @@ class _ChatBubbleState extends State<_ChatBubble> {
     _charIndex = 0;
     _displayedText = '';
 
-    // ~38ms per character matches Vietnamese TTS speaking cadence naturally
-    _typewriterTimer = Timer.periodic(const Duration(milliseconds: 38), (timer) {
+    _typewriterTimer =
+        Timer.periodic(const Duration(milliseconds: 35), (timer) {
       if (!mounted) {
         timer.cancel();
         return;
@@ -1636,6 +2105,12 @@ class _ChatBubbleState extends State<_ChatBubble> {
     widget.onStreamComplete();
   }
 
+  String _formatTime(DateTime t) {
+    final h = t.hour.toString().padLeft(2, '0');
+    final m = t.minute.toString().padLeft(2, '0');
+    return '$h:$m';
+  }
+
   @override
   void dispose() {
     _typewriterTimer?.cancel();
@@ -1654,193 +2129,254 @@ class _ChatBubbleState extends State<_ChatBubble> {
         child: Container(
           margin: EdgeInsets.only(
             top: 10,
-            left: isUser ? 48 : 0,
-            right: isUser ? 0 : 36,
+            left: isUser ? 44 : 0,
+            right: isUser ? 0 : 28,
           ),
-          child: LiquidGlassCard(
-            borderRadius: 20,
-            blur: isUser ? 12 : 18,
-            padding: const EdgeInsets.all(14),
-            tintColor: isUser ? null : (widget.isSpeaking ? AppTheme.accentCyan : null),
-            tintGradient: isUser
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            gradient: isUser
                 ? const LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      Color(0xFF7928CA), // Electric Violet
-                      Color(0xFF2563EB), // Deep Royal Blue
-                      Color(0xFF00F2FE), // Cyan highlight
+                      Color(0xFF2563EB),
+                      Color(0xFF0891B2),
                     ],
                   )
                 : null,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Text content with streaming cursor when active
-                RichText(
-                  text: TextSpan(
-                    style: TextStyle(
-                      color: isUser ? Colors.white : AppTheme.textPrimary,
-                      fontSize: 14,
-                      height: 1.45,
+            color: isUser
+                ? null
+                : const Color(0xFF151F32).withValues(alpha: 0.92),
+            borderRadius: BorderRadius.only(
+              topLeft: const Radius.circular(18),
+              topRight: const Radius.circular(18),
+              bottomLeft: Radius.circular(isUser ? 18 : 5),
+              bottomRight: Radius.circular(isUser ? 5 : 18),
+            ),
+            border: Border.all(
+              color: isUser
+                  ? Colors.white.withValues(alpha: 0.22)
+                  : (widget.isSpeaking
+                      ? AppTheme.accentCyan.withValues(alpha: 0.7)
+                      : Colors.white.withValues(alpha: 0.1)),
+              width: widget.isSpeaking ? 1.4 : 1.0,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.2),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Role & Timestamp Header
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    isUser
+                        ? Icons.person_rounded
+                        : Icons.smart_toy_outlined,
+                    size: 13,
+                    color: isUser
+                        ? Colors.white.withValues(alpha: 0.85)
+                        : AppTheme.accentCyan,
+                  ),
+                  const SizedBox(width: 5),
+                  Flexible(
+                    child: Text(
+                      isUser ? 'Bạn' : 'Trợ lý AI Đèn LED',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: isUser
+                            ? Colors.white.withValues(alpha: 0.9)
+                            : AppTheme.accentCyan,
+                      ),
                     ),
-                    children: [
-                      TextSpan(text: _displayedText),
-                      if (_isStreaming)
-                        const TextSpan(
-                          text: ' ▍',
-                          style: TextStyle(
-                            color: AppTheme.accentCyan,
-                            fontWeight: FontWeight.bold,
-                          ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    _formatTime(widget.message.timestamp),
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: isUser
+                          ? Colors.white.withValues(alpha: 0.65)
+                          : AppTheme.textSecondary.withValues(alpha: 0.8),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+
+              // Message Text Content
+              RichText(
+                text: TextSpan(
+                  style: TextStyle(
+                    color: isUser ? Colors.white : AppTheme.textPrimary,
+                    fontSize: 14,
+                    height: 1.45,
+                  ),
+                  children: [
+                    TextSpan(text: _displayedText),
+                    if (_isStreaming)
+                      const TextSpan(
+                        text: ' ▍',
+                        style: TextStyle(
+                          color: AppTheme.accentCyan,
+                          fontWeight: FontWeight.bold,
                         ),
+                      ),
+                  ],
+                ),
+              ),
+
+              // Executed MQTT Command Badges
+              if (commands.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: commands.map(_buildCommandBadge).toList(),
+                ),
+                const SizedBox(height: 6),
+                GestureDetector(
+                  onTap: () =>
+                      setState(() => _showRawSignal = !_showRawSignal),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _showRawSignal
+                            ? Icons.code_off_rounded
+                            : Icons.code_rounded,
+                        size: 13,
+                        color: AppTheme.textSecondary,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        _showRawSignal
+                            ? 'Ẩn tín hiệu JSON'
+                            : 'Xem tín hiệu MQTT (${commands.length} lệnh)',
+                        style: const TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontSize: 11,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
                     ],
                   ),
                 ),
-
-                // Executed MQTT command badges
-                if (commands.isNotEmpty) ...[
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: commands.map(_buildCommandBadge).toList(),
-                  ),
+                if (_showRawSignal) ...[
                   const SizedBox(height: 6),
-                  // Toggleable raw JSON signal view
-                  GestureDetector(
-                    onTap: () => setState(() => _showRawSignal = !_showRawSignal),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          _showRawSignal
-                              ? Icons.code_off_rounded
-                              : Icons.code_rounded,
-                          size: 13,
-                          color: AppTheme.textSecondary,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          _showRawSignal
-                              ? 'Ẩn tín hiệu JSON'
-                              : 'Xem tín hiệu điều khiển (${commands.length} lệnh)',
-                          style: const TextStyle(
-                            color: AppTheme.textSecondary,
-                            fontSize: 11,
-                            decoration: TextDecoration.underline,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (_showRawSignal) ...[
-                    const SizedBox(height: 6),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.35),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: AppTheme.accentCyan.withValues(alpha: 0.3),
-                        ),
-                      ),
-                      child: Text(
-                        const JsonEncoder.withIndent('  ').convert(commands),
-                        style: const TextStyle(
-                          fontFamily: 'monospace',
-                          fontSize: 11,
-                          color: AppTheme.accentCyan,
-                        ),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.4),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: AppTheme.accentCyan.withValues(alpha: 0.3),
                       ),
                     ),
-                  ],
-                ],
-
-                // Bottom row for AI message: Speak/Replay button & Model badge
-                if (!isUser) ...[
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 4,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      InkWell(
-                        onTap: widget.onToggleSpeak,
-                        borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: widget.isSpeaking
-                                ? AppTheme.accentCyan.withValues(alpha: 0.2)
-                                : Colors.white.withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: widget.isSpeaking
-                                  ? AppTheme.accentCyan.withValues(alpha: 0.6)
-                                  : Colors.white.withValues(alpha: 0.16),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                widget.isSpeaking
-                                    ? Icons.stop_circle_outlined
-                                    : Icons.volume_up_rounded,
-                                size: 13,
-                                color: widget.isSpeaking
-                                    ? AppTheme.accentCyan
-                                    : AppTheme.textSecondary,
-                              ),
-                              const SizedBox(width: 5),
-                              Text(
-                                widget.isSpeaking ? 'Đang nói (Dừng)' : 'Đọc lại',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: widget.isSpeaking
-                                      ? AppTheme.accentCyan
-                                      : AppTheme.textSecondary,
-                                  fontWeight: widget.isSpeaking
-                                      ? FontWeight.bold
-                                      : FontWeight.normal,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                    child: Text(
+                      const JsonEncoder.withIndent('  ').convert(commands),
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 11,
+                        color: AppTheme.accentCyan,
                       ),
-                      if (widget.message.modelUsed != null)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.06),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.12),
-                            ),
-                          ),
-                          child: Text(
-                            '🤖 ${widget.message.modelUsed}',
-                            style: const TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w500,
-                              color: AppTheme.textSecondary,
-                            ),
-                          ),
-                        ),
-                    ],
+                    ),
                   ),
                 ],
               ],
-            ),
+
+              // AI Message Action Bar: Speak button & Model badge
+              if (!isUser) ...[
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    InkWell(
+                      onTap: widget.onToggleSpeak,
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 9,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: widget.isSpeaking
+                              ? AppTheme.accentCyan.withValues(alpha: 0.2)
+                              : Colors.white.withValues(alpha: 0.06),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: widget.isSpeaking
+                                ? AppTheme.accentCyan.withValues(alpha: 0.6)
+                                : Colors.white.withValues(alpha: 0.14),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              widget.isSpeaking
+                                  ? Icons.stop_circle_outlined
+                                  : Icons.volume_up_rounded,
+                              size: 13,
+                              color: widget.isSpeaking
+                                  ? AppTheme.accentCyan
+                                  : AppTheme.textSecondary,
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              widget.isSpeaking
+                                  ? 'Đang đọc (Dừng)'
+                                  : 'Đọc tiếng Việt',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: widget.isSpeaking
+                                    ? AppTheme.accentCyan
+                                    : AppTheme.textSecondary,
+                                fontWeight: widget.isSpeaking
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    if (widget.message.modelUsed != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          widget.message.modelUsed!,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                            color: AppTheme.textSecondary,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ],
           ),
         ),
       ),
@@ -1867,18 +2403,12 @@ class _ChatBubbleState extends State<_ChatBubble> {
         final b = (cmd['b'] as num?)?.toInt() ?? 255;
         final c = Color.fromARGB(255, r, g, b);
         leadingDot = Container(
-          width: 12,
-          height: 12,
+          width: 11,
+          height: 11,
           decoration: BoxDecoration(
             color: c,
             shape: BoxShape.circle,
             border: Border.all(color: Colors.white, width: 1.2),
-            boxShadow: [
-              BoxShadow(
-                color: c.withValues(alpha: 0.5),
-                blurRadius: 4,
-              ),
-            ],
           ),
         );
         label = 'RGB($r, $g, $b)';
@@ -1898,7 +2428,7 @@ class _ChatBubbleState extends State<_ChatBubble> {
           orElse: () => LedEffect.none,
         );
         icon = Icons.auto_awesome_rounded;
-        label = 'Hiệu ứng: ${eff.displayName} (${speed}ms)';
+        label = '${eff.displayName} (${speed}ms)';
         badgeColor = AppTheme.accentPurple;
         break;
       case 'auto_mode':
@@ -1910,26 +2440,20 @@ class _ChatBubbleState extends State<_ChatBubble> {
       case 'num_leds':
         final count = (cmd['count'] as num?)?.toInt() ?? 8;
         icon = Icons.linear_scale_rounded;
-        label = 'Số LED: $count bóng';
+        label = '$count bóng LED';
         badgeColor = AppTheme.accentGreen;
         break;
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
       decoration: BoxDecoration(
-        color: badgeColor.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(10),
+        color: badgeColor.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: badgeColor.withValues(alpha: 0.45),
+          color: badgeColor.withValues(alpha: 0.4),
           width: 1,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: badgeColor.withValues(alpha: 0.15),
-            blurRadius: 6,
-          ),
-        ],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1937,7 +2461,7 @@ class _ChatBubbleState extends State<_ChatBubble> {
           if (leadingDot != null)
             leadingDot
           else
-            Icon(icon, color: badgeColor, size: 13),
+            Icon(icon, color: badgeColor, size: 12),
           const SizedBox(width: 5),
           Text(
             label,
@@ -1963,15 +2487,25 @@ class _QuickChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(right: 8),
-      child: LiquidGlassChip(
+      child: GestureDetector(
         onTap: onTap,
-        accentColor: AppTheme.accentCyan,
-        child: Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-            color: AppTheme.textPrimary,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          decoration: BoxDecoration(
+            color: const Color(0xFF151F32).withValues(alpha: 0.85),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: AppTheme.accentCyan.withValues(alpha: 0.28),
+            ),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textPrimary,
+            ),
           ),
         ),
       ),
@@ -1984,16 +2518,12 @@ class _GlassIconButton extends StatelessWidget {
   final VoidCallback onTap;
   final IconData icon;
   final Color iconColor;
-  final bool badgeDot;
-  final Color? badgeColor;
 
   const _GlassIconButton({
     required this.tooltip,
     required this.onTap,
     required this.icon,
     required this.iconColor,
-    this.badgeDot = false,
-    this.badgeColor,
   });
 
   @override
@@ -2003,35 +2533,18 @@ class _GlassIconButton extends StatelessWidget {
       child: GestureDetector(
         onTap: onTap,
         child: Container(
-          width: 36,
-          height: 36,
+          width: 34,
+          height: 34,
           decoration: BoxDecoration(
             color: Colors.white.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: Colors.white.withValues(alpha: 0.16),
+              color: Colors.white.withValues(alpha: 0.14),
               width: 1,
             ),
           ),
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Icon(icon, color: iconColor, size: 18),
-              if (badgeDot)
-                Positioned(
-                  top: 5,
-                  right: 5,
-                  child: Container(
-                    width: 6,
-                    height: 6,
-                    decoration: BoxDecoration(
-                      color: badgeColor ?? AppTheme.accentCyan,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                ),
-            ],
-          ),
+          alignment: Alignment.center,
+          child: Icon(icon, color: iconColor, size: 17),
         ),
       ),
     );

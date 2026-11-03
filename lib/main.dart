@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -67,12 +68,12 @@ class _AppInitializerState extends State<_AppInitializer>
   void initState() {
     super.initState();
     _fadeController = AnimationController(
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 450),
       vsync: this,
     );
     _fadeAnimation = CurvedAnimation(
       parent: _fadeController,
-      curve: Curves.easeIn,
+      curve: Curves.easeOut,
     );
     _initApp();
   }
@@ -82,20 +83,21 @@ class _AppInitializerState extends State<_AppInitializer>
     final mqtt = context.read<MqttService>();
     final ai = context.read<AiService>();
 
-    // Load saved settings
+    // Load saved settings quickly from local storage
     final config = await storage.loadMqttConfig();
     final apiKey = await storage.loadGeminiApiKey();
 
     mqtt.updateConfig(config);
     ai.setApiKey(apiKey);
 
-    // Try to connect
-    await mqtt.connect();
-
+    // Enter HomeScreen immediately without waiting for MQTT network timeout
     if (mounted) {
       setState(() => _initialized = true);
       _fadeController.forward();
     }
+
+    // Connect to MQTT in the background
+    unawaited(mqtt.connect());
   }
 
   @override
@@ -113,63 +115,33 @@ class _AppInitializerState extends State<_AppInitializer>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Animated logo
-              TweenAnimationBuilder<double>(
-                tween: Tween(begin: 0.0, end: 1.0),
-                duration: const Duration(milliseconds: 1200),
-                builder: (context, value, child) {
-                  return Transform.scale(
-                    scale: 0.5 + (value * 0.5),
-                    child: Opacity(
-                      opacity: value,
-                      child: Container(
-                        width: 100,
-                        height: 100,
-                        decoration: BoxDecoration(
-                          gradient: AppTheme.primaryGradient,
-                          borderRadius: BorderRadius.circular(28),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppTheme.accentBlue.withValues(alpha: 0.3),
-                              blurRadius: 30,
-                              spreadRadius: 5,
-                            ),
-                          ],
-                        ),
-                        child: const Icon(
-                          Icons.lightbulb_rounded,
-                          color: Colors.white,
-                          size: 48,
-                        ),
-                      ),
+              Container(
+                width: 90,
+                height: 90,
+                decoration: BoxDecoration(
+                  gradient: AppTheme.primaryGradient,
+                  borderRadius: BorderRadius.circular(26),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.accentBlue.withValues(alpha: 0.3),
+                      blurRadius: 24,
+                      spreadRadius: 4,
                     ),
-                  );
-                },
+                  ],
+                ),
+                child: const Icon(
+                  Icons.lightbulb_rounded,
+                  color: Colors.white,
+                  size: 44,
+                ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
               const Text(
                 'Smart LED',
                 style: TextStyle(
                   color: AppTheme.textPrimary,
-                  fontSize: 28,
+                  fontSize: 26,
                   fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Đang kết nối...',
-                style: TextStyle(
-                  color: AppTheme.textSecondary,
-                  fontSize: 14,
-                ),
-              ),
-              const SizedBox(height: 32),
-              SizedBox(
-                width: 32,
-                height: 32,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.5,
-                  color: AppTheme.accentBlue.withValues(alpha: 0.6),
                 ),
               ),
             ],

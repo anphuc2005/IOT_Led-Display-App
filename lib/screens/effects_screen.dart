@@ -16,7 +16,7 @@ class EffectsScreen extends StatelessWidget {
     final screenWidth = MediaQuery.sizeOf(context).width;
     final isTablet = screenWidth > 600;
     final crossAxisCount = screenWidth > 950 ? 4 : (isTablet ? 3 : 2);
-    final childAspectRatio = isTablet ? (screenWidth > 950 ? 1.4 : 1.35) : 1.28;
+    final childAspectRatio = isTablet ? (screenWidth > 950 ? 1.32 : 1.24) : 1.10;
 
     return SafeArea(
       bottom: false,
@@ -30,12 +30,14 @@ class EffectsScreen extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
+                const Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Hiệu Ứng LED',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 26,
                           fontWeight: FontWeight.w800,
@@ -43,9 +45,11 @@ class EffectsScreen extends StatelessWidget {
                           color: AppTheme.textPrimary,
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      const Text(
+                      SizedBox(height: 4),
+                      Text(
                         'Kho hiệu ứng ánh sáng động cho dải LED WS2812',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: AppTheme.textSecondary,
                           fontSize: 13,
@@ -55,6 +59,7 @@ class EffectsScreen extends StatelessWidget {
                     ],
                   ),
                 ),
+                const SizedBox(width: 10),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
@@ -119,46 +124,55 @@ class EffectsScreen extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: AppTheme.accentPurple.withValues(alpha: 0.18),
-                              border: Border.all(
-                                color: AppTheme.accentPurple.withValues(alpha: 0.35),
-                              ),
-                            ),
-                            child: const Icon(
-                              Icons.speed_rounded,
-                              size: 18,
-                              color: AppTheme.accentPurple,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          const Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Tốc Độ Hiệu Ứng',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 15,
-                                  color: AppTheme.textPrimary,
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: AppTheme.accentPurple.withValues(alpha: 0.18),
+                                border: Border.all(
+                                  color: AppTheme.accentPurple.withValues(alpha: 0.35),
                                 ),
                               ),
-                              Text(
-                                'Thời gian hoàn thành một chu kỳ',
-                                style: TextStyle(
-                                  color: AppTheme.textTertiary,
-                                  fontSize: 11,
-                                ),
+                              child: const Icon(
+                                Icons.speed_rounded,
+                                size: 18,
+                                color: AppTheme.accentPurple,
                               ),
-                            ],
-                          ),
-                        ],
+                            ),
+                            const SizedBox(width: 10),
+                            const Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Tốc Độ Hiệu Ứng',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 15,
+                                      color: AppTheme.textPrimary,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Thời gian hoàn thành một chu kỳ',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: AppTheme.textTertiary,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
+                      const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 12,
@@ -206,20 +220,30 @@ class EffectsScreen extends StatelessWidget {
                   const Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        '⚡ 50ms (Cực nhanh)',
-                        style: TextStyle(
-                          color: AppTheme.textTertiary,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
+                      Flexible(
+                        child: Text(
+                          '⚡ 50ms (Cực nhanh)',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: AppTheme.textTertiary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
-                      Text(
-                        '3000ms (Thư thái) 🌙',
-                        style: TextStyle(
-                          color: AppTheme.textTertiary,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
+                      SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          '3000ms (Thư thái) 🌙',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.right,
+                          style: TextStyle(
+                            color: AppTheme.textTertiary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ],
@@ -227,31 +251,45 @@ class EffectsScreen extends StatelessWidget {
                   const SizedBox(height: 12),
                   // Preset speed pills
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [100, 300, 500, 1000, 2000].map((ms) {
                       final isSel = (state.effectSpeed - ms).abs() < 50;
-                      return GestureDetector(
-                        onTap: () => led.setEffectSpeed(ms),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: isSel
-                                ? AppTheme.accentPurple.withValues(alpha: 0.28)
-                                : Colors.white.withValues(alpha: 0.06),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: isSel
-                                  ? AppTheme.accentPurple
-                                  : Colors.white.withValues(alpha: 0.12),
-                              width: isSel ? 1.5 : 1,
-                            ),
-                          ),
-                          child: Text(
-                            '${ms}ms',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
-                              color: isSel ? AppTheme.accentPurple : AppTheme.textSecondary,
+                      return Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 2.5),
+                          child: GestureDetector(
+                            onTap: () => led.setEffectSpeed(ms),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                                vertical: 6,
+                              ),
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: isSel
+                                    ? AppTheme.accentPurple.withValues(alpha: 0.28)
+                                    : Colors.white.withValues(alpha: 0.06),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isSel
+                                      ? AppTheme.accentPurple
+                                      : Colors.white.withValues(alpha: 0.12),
+                                  width: isSel ? 1.5 : 1,
+                                ),
+                              ),
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  '${ms}ms',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight:
+                                        isSel ? FontWeight.w800 : FontWeight.w600,
+                                    color: isSel
+                                        ? AppTheme.accentPurple
+                                        : AppTheme.textSecondary,
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -267,23 +305,29 @@ class EffectsScreen extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Row(
-                  children: [
-                    Icon(
-                      Icons.auto_awesome_rounded,
-                      size: 18,
-                      color: AppTheme.accentCyan,
-                    ),
-                    SizedBox(width: 8),
-                    Text(
-                      'Danh Sách Hiệu Ứng',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.textPrimary,
+                const Expanded(
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.auto_awesome_rounded,
+                        size: 18,
+                        color: AppTheme.accentCyan,
                       ),
-                    ),
-                  ],
+                      SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          'Danh Sách Hiệu Ứng',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.textPrimary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 Text(
                   '${LedEffect.values.length} chế độ',
@@ -450,34 +494,41 @@ class _Ws2812StripSimulatorState extends State<_Ws2812StripSimulator>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(7),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: widget.effect.themeColor.withValues(alpha: 0.18),
-                      border: Border.all(
-                        color: widget.effect.themeColor.withValues(alpha: 0.4),
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: widget.effect.themeColor.withValues(alpha: 0.18),
+                        border: Border.all(
+                          color: widget.effect.themeColor.withValues(alpha: 0.4),
+                        ),
+                      ),
+                      child: Icon(
+                        widget.effect.iconData,
+                        size: 16,
+                        color: widget.effect.themeColor,
                       ),
                     ),
-                    child: Icon(
-                      widget.effect.iconData,
-                      size: 16,
-                      color: widget.effect.themeColor,
+                    const SizedBox(width: 10),
+                    const Flexible(
+                      child: Text(
+                        'Mô Phỏng WS2812 Live Strip',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  const Text(
-                    'Mô Phỏng WS2812 Live Strip',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                      color: AppTheme.textPrimary,
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
@@ -570,8 +621,8 @@ class _Ws2812StripSimulatorState extends State<_Ws2812StripSimulator>
                         final isBright = pixelColor.a > 0.3;
 
                         return Container(
-                          width: 14,
-                          height: 14,
+                          width: 13,
+                          height: 13,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: pixelColor,
@@ -603,20 +654,30 @@ class _Ws2812StripSimulatorState extends State<_Ws2812StripSimulator>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Hiệu ứng: ${widget.effect.displayName}',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: widget.effect.themeColor,
+              Flexible(
+                child: Text(
+                  'Hiệu ứng: ${widget.effect.displayName}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: widget.effect.themeColor,
+                  ),
                 ),
               ),
-              Text(
-                'Chu kỳ: ${widget.speedMs}ms • WS2812B 800kHz',
-                style: const TextStyle(
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w500,
-                  color: AppTheme.textTertiary,
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  'Chu kỳ: ${widget.speedMs}ms • WS2812B 800kHz',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w500,
+                    color: AppTheme.textTertiary,
+                  ),
                 ),
               ),
             ],
@@ -645,7 +706,7 @@ class _LiquidEffectCard extends StatelessWidget {
 
     return LiquidGlassCard(
       borderRadius: 20,
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(12),
       tintColor: isSelected ? themeColor : null,
       onTap: onTap,
       child: Column(
@@ -658,13 +719,13 @@ class _LiquidEffectCard extends StatelessWidget {
             children: [
               // Standardized 3D Glass Icon Squircle
               Container(
-                width: 38,
-                height: 38,
+                width: 36,
+                height: 36,
                 decoration: BoxDecoration(
                   color: isSelected
                       ? themeColor.withValues(alpha: 0.28)
                       : Colors.white.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(13),
+                  borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color: isSelected
                         ? themeColor.withValues(alpha: 0.6)
@@ -685,48 +746,55 @@ class _LiquidEffectCard extends StatelessWidget {
                   child: Icon(
                     effect.iconData,
                     color: isSelected ? Colors.white : themeColor,
-                    size: 20,
+                    size: 19,
                   ),
                 ),
               ),
+              const SizedBox(width: 6),
               // Active status pill
               if (isSelected)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: themeColor.withValues(alpha: 0.22),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: themeColor.withValues(alpha: 0.5),
+                Flexible(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: themeColor.withValues(alpha: 0.22),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: themeColor.withValues(alpha: 0.5),
+                      ),
                     ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 5,
-                        height: 5,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: themeColor,
-                          boxShadow: [
-                            BoxShadow(
-                              color: themeColor.withValues(alpha: 0.8),
-                              blurRadius: 4,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 5,
+                          height: 5,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: themeColor,
+                            boxShadow: [
+                              BoxShadow(
+                                color: themeColor.withValues(alpha: 0.8),
+                                blurRadius: 4,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            'Đang chạy',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: themeColor,
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w800,
                             ),
-                          ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Đang chạy',
-                        style: TextStyle(
-                          color: themeColor,
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 )
               else
@@ -737,34 +805,40 @@ class _LiquidEffectCard extends StatelessWidget {
                 ),
             ],
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                effect.displayName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: isSelected ? Colors.white : AppTheme.textPrimary,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13.5,
-                  letterSpacing: -0.2,
+          const SizedBox(height: 6),
+          Flexible(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  effect.displayName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: isSelected ? Colors.white : AppTheme.textPrimary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13.5,
+                    letterSpacing: -0.2,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                effect.description,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: isSelected
-                      ? Colors.white.withValues(alpha: 0.85)
-                      : AppTheme.textSecondary,
-                  fontSize: 11,
-                  height: 1.25,
+                const SizedBox(height: 2),
+                Flexible(
+                  child: Text(
+                    effect.description,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: isSelected
+                          ? Colors.white.withValues(alpha: 0.85)
+                          : AppTheme.textSecondary,
+                      fontSize: 11,
+                      height: 1.2,
+                    ),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),

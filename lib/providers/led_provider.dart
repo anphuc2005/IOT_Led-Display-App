@@ -7,15 +7,18 @@ import '../services/mqtt_service.dart';
 
 class LedProvider extends ChangeNotifier {
   final MqttService _mqttService;
-  LedState _ledState = const LedState();
+  LedState _ledState = const LedState(numLeds: 8);
   SensorData _sensorData = SensorData();
   bool _autoMode = false;
+  String _subscribedPrefix = '';
   final List<SensorData> _lightHistory = [];
   StreamSubscription? _lightSub;
   StreamSubscription? _motionSub;
+  StreamSubscription? _climateSub;
 
   LedProvider(this._mqttService) {
     _setupSubscriptions();
+    _mqttService.addListener(_onMqttChanged);
   }
 
   LedState get ledState => _ledState;
@@ -23,8 +26,19 @@ class LedProvider extends ChangeNotifier {
   bool get autoMode => _autoMode;
   List<SensorData> get lightHistory => List.unmodifiable(_lightHistory);
 
+  void _onMqttChanged() {
+    if (_mqttService.config.topicPrefix != _subscribedPrefix) {
+      _setupSubscriptions();
+    }
+  }
+
   void _setupSubscriptions() {
+    _lightSub?.cancel();
+    _motionSub?.cancel();
+    _climateSub?.cancel();
+
     final config = _mqttService.config;
+    _subscribedPrefix = config.topicPrefix;
 
     _lightSub = _mqttService.subscribe(config.sensorLightTopic).listen((data) {
       try {
@@ -49,7 +63,7 @@ class LedProvider extends ChangeNotifier {
       try {
         final json = jsonDecode(data);
         _sensorData = _sensorData.copyWith(
-          motionDetected: json['detected'] as bool,
+          motionDetected: json['detected'] as bool? ?? false,
           timestamp: DateTime.now(),
         );
 
@@ -61,16 +75,34 @@ class LedProvider extends ChangeNotifier {
         debugPrint('Error parsing motion sensor: $e');
       }
     });
+
+    _climateSub =
+        _mqttService.subscribe(config.sensorClimateTopic).listen((data) {
+      try {
+        final json = jsonDecode(data);
+        if (json['valid'] == true) {
+          _sensorData = _sensorData.copyWith(
+            temperature: (json['temperature'] as num?)?.toDouble(),
+            humidity: (json['humidity'] as num?)?.toDouble(),
+            hasClimate: true,
+            timestamp: DateTime.now(),
+          );
+          notifyListeners();
+        }
+      } catch (e) {
+        debugPrint('Error parsing climate sensor: $e');
+      }
+    });
   }
 
   void _autoAdjustBrightness() {
     final lux = _sensorData.lightIntensity;
     int brightness;
-    if (lux < 50) {
+    if (lux < 30) {
       brightness = 100;
-    } else if (lux < 200) {
+    } else if (lux < 150) {
       brightness = 80;
-    } else if (lux < 500) {
+    } else if (lux < 400) {
       brightness = 50;
     } else {
       brightness = 20;
@@ -78,7 +110,22 @@ class LedProvider extends ChangeNotifier {
     setBrightness(brightness);
   }
 
+  /// Ensures ESP32 exits autoMode and turns on ledPower when user manually adjusts color/brightness/effect
+  void _ensureManualPowerOn() {
+    if (!_ledState.isOn || _autoMode) {
+      _autoMode = false;
+      _ledState = _ledState.copyWith(isOn: true);
+      _mqttService.publish(
+        _mqttService.config.powerTopic,
+        {'state': 'on'},
+      );
+    }
+  }
+
   void togglePower(bool on) {
+    if (on) {
+      _autoMode = false;
+    }
     _ledState = _ledState.copyWith(isOn: on);
     _mqttService.publish(
       _mqttService.config.powerTopic,
@@ -88,6 +135,7 @@ class LedProvider extends ChangeNotifier {
   }
 
   void setColor(Color color) {
+    _ensureManualPowerOn();
     _ledState = _ledState.copyWith(color: color);
     _mqttService.publish(
       _mqttService.config.colorTopic,
@@ -97,6 +145,7 @@ class LedProvider extends ChangeNotifier {
   }
 
   void setBrightness(int brightness) {
+    _ensureManualPowerOn();
     _ledState = _ledState.copyWith(brightness: brightness.clamp(0, 100));
     _mqttService.publish(
       _mqttService.config.brightnessTopic,
@@ -106,6 +155,7 @@ class LedProvider extends ChangeNotifier {
   }
 
   void setEffect(LedEffect effect) {
+    _ensureManualPowerOn();
     _ledState = _ledState.copyWith(effect: effect);
     _mqttService.publish(
       _mqttService.config.effectTopic,
@@ -115,6 +165,7 @@ class LedProvider extends ChangeNotifier {
   }
 
   void setEffectSpeed(int speed) {
+    _ensureManualPowerOn();
     _ledState = _ledState.copyWith(effectSpeed: speed.clamp(50, 3000));
     _mqttService.publish(
       _mqttService.config.effectTopic,
@@ -141,6 +192,28 @@ class LedProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Sends a quick hardware test signal to ESP32 (Power ON + Cyan color + 100% brightness)
+  void sendHardwareTestPing() {
+    _autoMode = false;
+    _ledState = _ledState.copyWith(
+      isOn: true,
+      color: const Color(0xFF00F5D4),
+      brightness: 100,
+      effect: LedEffect.none,
+    );
+    _mqttService.publish(_mqttService.config.powerTopic, {'state': 'on'});
+    _mqttService.publish(_mqttService.config.brightnessTopic, {'value': 100});
+    _mqttService.publish(_mqttService.config.effectTopic, {
+      'type': 'none',
+      'speed': _ledState.effectSpeed,
+    });
+    _mqttService.publish(
+      _mqttService.config.colorTopic,
+      {'r': 0, 'g': 245, 'b': 212},
+    );
+    notifyListeners();
+  }
+
   /// Build current device & sensor context for AI prompt
   String buildStateContextSummary() {
     final c = _ledState.color;
@@ -155,7 +228,8 @@ class LedProvider extends ChangeNotifier {
         'số bóng LED=${_ledState.numLeds}, '
         'chế độ tự động=${_autoMode ? "BẬT" : "TẮT"}, '
         'cảm biến ánh sáng=${_sensorData.lightIntensity.toStringAsFixed(1)} lux, '
-        'chuyển động PIR=${_sensorData.motionDetected ? "CÓ NGƯỜI" : "KHÔNG"}.';
+        'chuyển động PIR=${_sensorData.motionDetected ? "CÓ NGƯỜI" : "KHÔNG"}'
+        '${_sensorData.hasClimate ? ", nhiệt độ=${_sensorData.temperature.toStringAsFixed(1)}°C, độ ẩm=${_sensorData.humidity.toStringAsFixed(0)}%" : ""}.';
   }
 
   /// Execute multiple commands from AI assistant in optimal MQTT order
@@ -210,7 +284,6 @@ class LedProvider extends ChangeNotifier {
         togglePower(command['state'] == 'on');
         break;
       case 'color':
-        if (!_ledState.isOn) togglePower(true);
         setColor(Color.fromARGB(
           255,
           ((command['r'] as num?)?.toInt() ?? 255).clamp(0, 255),
@@ -222,7 +295,7 @@ class LedProvider extends ChangeNotifier {
         setBrightness(((command['value'] as num?)?.toInt() ?? 100).clamp(0, 100));
         break;
       case 'effect':
-        if (!_ledState.isOn) togglePower(true);
+        _ensureManualPowerOn();
         final type = command['type'] as String?;
         final effect = LedEffect.values.firstWhere(
           (e) => e.mqttValue == type,
@@ -253,8 +326,10 @@ class LedProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _mqttService.removeListener(_onMqttChanged);
     _lightSub?.cancel();
     _motionSub?.cancel();
+    _climateSub?.cancel();
     super.dispose();
   }
 }

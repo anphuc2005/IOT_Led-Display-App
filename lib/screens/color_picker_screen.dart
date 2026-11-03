@@ -194,29 +194,36 @@ class _ColorPickerScreenState extends State<ColorPickerScreen> {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Studio Màu Sắc',
-              style: TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.5,
-                color: AppTheme.textPrimary,
+        const Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Studio Màu Sắc',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.5,
+                  color: AppTheme.textPrimary,
+                ),
               ),
-            ),
-            SizedBox(height: 3),
-            Text(
-              'Không gian 16.7 triệu màu • WS2812B Engine',
-              style: TextStyle(
-                color: AppTheme.textSecondary,
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
+              SizedBox(height: 3),
+              Text(
+                'Không gian 16.7 triệu màu • WS2812B Engine',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: AppTheme.textSecondary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
+        const SizedBox(width: 10),
         // Live Sync Pill
         GestureDetector(
           onTap: () {
@@ -286,8 +293,8 @@ class _ColorPickerScreenState extends State<ColorPickerScreen> {
             children: [
               // 3D Gemstone Sphere
               Container(
-                width: 58,
-                height: 58,
+                width: 54,
+                height: 54,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
@@ -321,15 +328,20 @@ class _ColorPickerScreenState extends State<ColorPickerScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          _getColorName(_currentColor),
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -0.2,
-                            color: AppTheme.textPrimary,
+                        Expanded(
+                          child: Text(
+                            _getColorName(_currentColor),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.2,
+                              color: AppTheme.textPrimary,
+                            ),
                           ),
                         ),
+                        const SizedBox(width: 8),
                         // Copy Hex Pill
                         GestureDetector(
                           onTap: () {
@@ -377,12 +389,12 @@ class _ColorPickerScreenState extends State<ColorPickerScreen> {
                     ),
                     const SizedBox(height: 6),
                     // RGB Badges
-                    Row(
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
                       children: [
                         _buildRgbPill('R', _r, const Color(0xFFFF2D55)),
-                        const SizedBox(width: 6),
                         _buildRgbPill('G', _g, const Color(0xFF00F5D4)),
-                        const SizedBox(width: 6),
                         _buildRgbPill('B', _b, const Color(0xFF38BDF8)),
                       ],
                     ),
@@ -441,12 +453,16 @@ class _ColorPickerScreenState extends State<ColorPickerScreen> {
               children: [
                 Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
                 SizedBox(width: 8),
-                Text(
-                  'Áp Dụng Lên Đèn Ngay',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 14,
+                Flexible(
+                  child: Text(
+                    'Áp Dụng Lên Đèn Ngay',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 14,
+                    ),
                   ),
                 ),
               ],
@@ -505,7 +521,7 @@ class _ColorPickerScreenState extends State<ColorPickerScreen> {
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 curve: Curves.easeOutCubic,
-                padding: const EdgeInsets.symmetric(vertical: 9),
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 9),
                 decoration: BoxDecoration(
                   color: isSelected
                       ? AppTheme.accentCyan.withValues(alpha: 0.25)
@@ -523,16 +539,17 @@ class _ColorPickerScreenState extends State<ColorPickerScreen> {
                   children: [
                     Icon(
                       tab['icon'] as IconData,
-                      size: 15,
+                      size: 14,
                       color: isSelected ? AppTheme.accentCyan : AppTheme.textSecondary,
                     ),
-                    const SizedBox(width: 5),
+                    const SizedBox(width: 4),
                     Flexible(
                       child: Text(
                         tab['label'] as String,
+                        maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 11.5,
+                          fontSize: 11,
                           fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
                           color: isSelected ? AppTheme.textPrimary : AppTheme.textSecondary,
                         ),
@@ -574,14 +591,19 @@ class _ColorPickerScreenState extends State<ColorPickerScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Bánh Xe Màu Trực Quan',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14,
-                  color: AppTheme.textPrimary,
+              const Expanded(
+                child: Text(
+                  'Bánh Xe Màu Trực Quan',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    color: AppTheme.textPrimary,
+                  ),
                 ),
               ),
+              const SizedBox(width: 8),
               // Wheel vs Square Mode Switch
               GestureDetector(
                 onTap: () => setState(() => _wheelMode = !_wheelMode),
@@ -618,19 +640,27 @@ class _ColorPickerScreenState extends State<ColorPickerScreen> {
           const SizedBox(height: 14),
 
           // Color Picker Container (Constrained & perfectly centered)
-          Center(
-            child: ColorPicker(
-              pickerColor: _currentColor,
-              onColorChanged: _onColorChanged,
-              enableAlpha: false,
-              displayThumbColor: true,
-              paletteType: _wheelMode ? PaletteType.hueWheel : PaletteType.hsvWithHue,
-              colorPickerWidth: 240,
-              pickerAreaHeightPercent: _wheelMode ? 0.9 : 0.65,
-              portraitOnly: true,
-              labelTypes: const [],
-              pickerAreaBorderRadius: BorderRadius.circular(18),
-            ),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final pickerWidth =
+                  (constraints.maxWidth - 16).clamp(170.0, 230.0);
+              return Center(
+                child: ColorPicker(
+                  pickerColor: _currentColor,
+                  onColorChanged: _onColorChanged,
+                  enableAlpha: false,
+                  displayThumbColor: true,
+                  paletteType: _wheelMode
+                      ? PaletteType.hueWheel
+                      : PaletteType.hsvWithHue,
+                  colorPickerWidth: pickerWidth,
+                  pickerAreaHeightPercent: _wheelMode ? 0.88 : 0.65,
+                  portraitOnly: true,
+                  labelTypes: const [],
+                  pickerAreaBorderRadius: BorderRadius.circular(18),
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -656,20 +686,27 @@ class _ColorPickerScreenState extends State<ColorPickerScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Row(
-                children: [
-                  Icon(Icons.wb_incandescent_rounded, size: 18, color: AppTheme.accentOrange),
-                  SizedBox(width: 8),
-                  Text(
-                    'Nhiệt Độ Màu Trắng (Kelvin)',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: AppTheme.textPrimary,
+              const Expanded(
+                child: Row(
+                  children: [
+                    Icon(Icons.wb_incandescent_rounded, size: 18, color: AppTheme.accentOrange),
+                    SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        'Nhiệt Độ Màu Trắng (Kelvin)',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
@@ -792,6 +829,8 @@ class _ColorPickerScreenState extends State<ColorPickerScreen> {
                           children: [
                             Text(
                               preset['label'] as String,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 fontWeight: FontWeight.w700,
                                 fontSize: 13,
@@ -800,6 +839,8 @@ class _ColorPickerScreenState extends State<ColorPickerScreen> {
                             ),
                             Text(
                               preset['desc'] as String,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 fontSize: 11,
                                 color: isSel ? previewColor : AppTheme.textSecondary,
@@ -838,14 +879,19 @@ class _ColorPickerScreenState extends State<ColorPickerScreen> {
           const Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Kênh Màu Độc Lập (0 - 255)',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14,
-                  color: AppTheme.textPrimary,
+              Flexible(
+                child: Text(
+                  'Kênh Màu Độc Lập (0 - 255)',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    color: AppTheme.textPrimary,
+                  ),
                 ),
               ),
+              SizedBox(width: 8),
               Text(
                 'Phối màu cộng RGB',
                 style: TextStyle(fontSize: 11, color: AppTheme.textTertiary),
@@ -1022,52 +1068,60 @@ class _ColorPickerScreenState extends State<ColorPickerScreen> {
                 ),
                 const SizedBox(height: 8),
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: colors.map((item) {
                     final color = item['color'] as Color;
                     final isSel = _currentColor.toARGB32() == color.toARGB32();
 
-                    return GestureDetector(
-                      onTap: () => _onColorChanged(color),
-                      child: Column(
-                        children: [
-                          Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: RadialGradient(
-                                center: const Alignment(-0.35, -0.45),
-                                radius: 0.85,
-                                colors: [
-                                  Colors.white.withValues(alpha: 0.8),
-                                  color,
-                                  color.withValues(alpha: 0.85),
+                    return Expanded(
+                      child: GestureDetector(
+                        onTap: () => _onColorChanged(color),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 42,
+                              height: 42,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: RadialGradient(
+                                  center: const Alignment(-0.35, -0.45),
+                                  radius: 0.85,
+                                  colors: [
+                                    Colors.white.withValues(alpha: 0.8),
+                                    color,
+                                    color.withValues(alpha: 0.85),
+                                  ],
+                                ),
+                                border: Border.all(
+                                  color: isSel ? Colors.white : Colors.white.withValues(alpha: 0.35),
+                                  width: isSel ? 2.5 : 1.2,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: color.withValues(alpha: isSel ? 0.75 : 0.4),
+                                    blurRadius: isSel ? 12 : 8,
+                                    spreadRadius: isSel ? 1.5 : 0,
+                                  ),
                                 ],
                               ),
-                              border: Border.all(
-                                color: isSel ? Colors.white : Colors.white.withValues(alpha: 0.35),
-                                width: isSel ? 2.5 : 1.2,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: color.withValues(alpha: isSel ? 0.75 : 0.4),
-                                  blurRadius: isSel ? 12 : 8,
-                                  spreadRadius: isSel ? 1.5 : 0,
+                            ),
+                            const SizedBox(height: 4),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 2),
+                              child: Text(
+                                item['name'] as String,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: isSel ? FontWeight.w800 : FontWeight.w500,
+                                  color: isSel ? AppTheme.accentCyan : AppTheme.textSecondary,
                                 ),
-                              ],
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            item['name'] as String,
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: isSel ? FontWeight.w800 : FontWeight.w500,
-                              color: isSel ? AppTheme.accentCyan : AppTheme.textSecondary,
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     );
                   }).toList(),
@@ -1093,6 +1147,8 @@ class _ColorPickerScreenState extends State<ColorPickerScreen> {
       {'name': 'Trắng 5000K', 'color': Colors.white},
     ];
 
+    final isWide = MediaQuery.sizeOf(context).width > 520;
+
     return LiquidGlassCard(
       borderRadius: 22,
       padding: const EdgeInsets.all(16),
@@ -1102,14 +1158,19 @@ class _ColorPickerScreenState extends State<ColorPickerScreen> {
           const Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Màu Chọn Nhanh Phổ Biến',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14,
-                  color: AppTheme.textPrimary,
+              Expanded(
+                child: Text(
+                  'Màu Chọn Nhanh Phổ Biến',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    color: AppTheme.textPrimary,
+                  ),
                 ),
               ),
+              SizedBox(width: 8),
               Text(
                 '1 Chạm',
                 style: TextStyle(
@@ -1124,11 +1185,11 @@ class _ColorPickerScreenState extends State<ColorPickerScreen> {
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 4,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: isWide ? 4 : 2,
               mainAxisSpacing: 10,
               crossAxisSpacing: 10,
-              childAspectRatio: 1.6,
+              childAspectRatio: isWide ? 2.1 : 2.9,
             ),
             itemCount: quickColors.length,
             itemBuilder: (context, index) {
@@ -1139,7 +1200,7 @@ class _ColorPickerScreenState extends State<ColorPickerScreen> {
               return GestureDetector(
                 onTap: () => _onColorChanged(color),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
                     color: color.withValues(alpha: 0.18),
                     borderRadius: BorderRadius.circular(12),
@@ -1167,14 +1228,14 @@ class _ColorPickerScreenState extends State<ColorPickerScreen> {
                           border: Border.all(color: Colors.white.withValues(alpha: 0.6)),
                         ),
                       ),
-                      const SizedBox(width: 6),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           item['name'] as String,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize: 10.5,
+                            fontSize: 11.5,
                             fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
                             color: isSel ? Colors.white : AppTheme.textPrimary,
                           ),

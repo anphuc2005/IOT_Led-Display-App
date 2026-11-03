@@ -117,59 +117,67 @@ class _LiquidFloatingNavBar extends StatelessWidget {
 
   Widget _navItem(int index, IconData icon, String label) {
     final isSelected = currentIndex == index;
-    return GestureDetector(
-      onTap: () => onTap(index),
-      behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOutCubic,
-        padding: EdgeInsets.symmetric(
-          horizontal: isSelected ? 14 : 10,
-          vertical: 8,
-        ),
-        decoration: isSelected
-            ? BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
-                gradient: LinearGradient(
-                  colors: [
-                    AppTheme.accentCyan.withValues(alpha: 0.35),
-                    AppTheme.accentBlue.withValues(alpha: 0.18),
-                  ],
-                ),
-                border: Border.all(
-                  color: AppTheme.accentCyan.withValues(alpha: 0.65),
-                  width: 1.1,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppTheme.accentCyan.withValues(alpha: 0.30),
-                    blurRadius: 14,
-                    offset: const Offset(0, 2),
+    return Flexible(
+      flex: isSelected ? 2 : 1,
+      child: GestureDetector(
+        onTap: () => onTap(index),
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          padding: EdgeInsets.symmetric(
+            horizontal: isSelected ? 12 : 8,
+            vertical: 8,
+          ),
+          decoration: isSelected
+              ? BoxDecoration(
+                  borderRadius: BorderRadius.circular(24),
+                  gradient: LinearGradient(
+                    colors: [
+                      AppTheme.accentCyan.withValues(alpha: 0.35),
+                      AppTheme.accentBlue.withValues(alpha: 0.18),
+                    ],
                   ),
-                ],
-              )
-            : null,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 21,
-              color: isSelected ? AppTheme.accentCyan : AppTheme.textSecondary,
-            ),
-            if (isSelected) ...[
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: AppTheme.textPrimary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -0.2,
-                ),
+                  border: Border.all(
+                    color: AppTheme.accentCyan.withValues(alpha: 0.65),
+                    width: 1.1,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.accentCyan.withValues(alpha: 0.30),
+                      blurRadius: 14,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                )
+              : null,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 20,
+                color: isSelected ? AppTheme.accentCyan : AppTheme.textSecondary,
               ),
+              if (isSelected) ...[
+                const SizedBox(width: 5),
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppTheme.textPrimary,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -188,6 +196,7 @@ class _DashboardView extends StatelessWidget {
     final state = led.ledState;
     final screenWidth = MediaQuery.sizeOf(context).width;
     final isTablet = screenWidth > 600;
+    final isConnecting = mqtt.connectionState == AppConnectionState.connecting;
 
     return SafeArea(
       bottom: false,
@@ -203,58 +212,36 @@ class _DashboardView extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Smart LED Pro',
-                            style: TextStyle(
-                              fontSize: 26,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -0.5,
-                              color: AppTheme.textPrimary,
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Smart LED Pro',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 26,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.5,
+                                color: AppTheme.textPrimary,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              Container(
-                                width: 8,
-                                height: 8,
-                                decoration: BoxDecoration(
-                                  color: mqtt.isConnected
-                                      ? AppTheme.accentCyan
-                                      : AppTheme.accentRed,
-                                  shape: BoxShape.circle,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: (mqtt.isConnected
-                                              ? AppTheme.accentCyan
-                                              : AppTheme.accentRed)
-                                          .withValues(alpha: 0.6),
-                                      blurRadius: 6,
-                                      spreadRadius: 1,
-                                    ),
-                                  ],
-                                ),
+                            SizedBox(height: 3),
+                            Text(
+                              'Điều khiển phần cứng ESP32 & WS2812B',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: AppTheme.textSecondary,
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w500,
                               ),
-                              const SizedBox(width: 8),
-                              Text(
-                                mqtt.isConnected
-                                    ? 'ESP32 Online • MQTT Sẵn sàng'
-                                    : 'Chưa kết nối MQTT',
-                                style: TextStyle(
-                                  color: mqtt.isConnected
-                                      ? AppTheme.accentCyan
-                                      : AppTheme.textSecondary,
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
+                            ),
+                          ],
+                        ),
                       ),
+                      const SizedBox(width: 12),
                       // Settings Liquid Glass Button
                       ClipRRect(
                         borderRadius: BorderRadius.circular(16),
@@ -290,7 +277,189 @@ class _DashboardView extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 22),
+                  const SizedBox(height: 14),
+
+                  // Quick Hardware Connection Banner (1-Tap Connect / Test Hardware)
+                  LiquidGlassCard(
+                    borderRadius: 18,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 11,
+                    ),
+                    tintColor: mqtt.isConnected
+                        ? AppTheme.accentCyan
+                        : (isConnecting
+                            ? AppTheme.accentOrange
+                            : AppTheme.accentRed),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 34,
+                          height: 34,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: (mqtt.isConnected
+                                    ? AppTheme.accentCyan
+                                    : (isConnecting
+                                        ? AppTheme.accentOrange
+                                        : AppTheme.accentRed))
+                                .withValues(alpha: 0.18),
+                            border: Border.all(
+                              color: (mqtt.isConnected
+                                      ? AppTheme.accentCyan
+                                      : (isConnecting
+                                          ? AppTheme.accentOrange
+                                          : AppTheme.accentRed))
+                                  .withValues(alpha: 0.45),
+                            ),
+                          ),
+                          child: Center(
+                            child: isConnecting
+                                ? const SizedBox(
+                                    width: 15,
+                                    height: 15,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: AppTheme.accentOrange,
+                                    ),
+                                  )
+                                : Icon(
+                                    mqtt.isConnected
+                                        ? Icons.memory_rounded
+                                        : Icons.wifi_off_rounded,
+                                    size: 18,
+                                    color: mqtt.isConnected
+                                        ? AppTheme.accentCyan
+                                        : AppTheme.accentRed,
+                                  ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                mqtt.isConnected
+                                    ? 'ESP32 Sẵn Sàng (${mqtt.config.broker})'
+                                    : (isConnecting
+                                        ? 'Đang kết nối ${mqtt.config.broker}...'
+                                        : 'Chưa kết nối mạch ESP32'),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: mqtt.isConnected
+                                      ? AppTheme.accentCyan
+                                      : AppTheme.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Topic: ${mqtt.config.topicPrefix}/# • ${state.numLeds} bóng WS2812',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: AppTheme.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        if (mqtt.isConnected)
+                          GestureDetector(
+                            onTap: () {
+                              led.sendHardwareTestPing();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: const Text(
+                                    '⚡ Đã gửi lệnh bật sáng thử nghiệm tới mạch ESP32!',
+                                  ),
+                                  backgroundColor: AppTheme.accentGreen,
+                                  behavior: SnackBarBehavior.floating,
+                                  duration: const Duration(seconds: 2),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                              );
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppTheme.accentCyan.withValues(alpha: 0.22),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: AppTheme.accentCyan.withValues(alpha: 0.5),
+                                ),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.flash_on_rounded,
+                                    size: 14,
+                                    color: AppTheme.accentCyan,
+                                  ),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'Thử đèn',
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppTheme.accentCyan,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                        else if (!isConnecting)
+                          GestureDetector(
+                            onTap: () => mqtt.connect(),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppTheme.accentCyan.withValues(alpha: 0.22),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: AppTheme.accentCyan.withValues(alpha: 0.55),
+                                ),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.sync_rounded,
+                                    size: 14,
+                                    color: AppTheme.accentCyan,
+                                  ),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'Kết nối lại',
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppTheme.accentCyan,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
 
                   // 3D Liquid Glass Power Switch Card
                   LiquidGlassCard(
@@ -304,13 +473,15 @@ class _DashboardView extends StatelessWidget {
                           isOn: state.isOn,
                           color: state.color,
                         ),
-                        const SizedBox(width: 18),
+                        const SizedBox(width: 16),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 state.isOn ? 'Đèn đang BẬT' : 'Đèn đang TẮT',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.w700,
@@ -320,6 +491,8 @@ class _DashboardView extends StatelessWidget {
                               const SizedBox(height: 4),
                               Text(
                                 'Độ sáng ${state.brightness}% • ${state.effect.displayName}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                   color: AppTheme.textSecondary,
                                   fontSize: 13,
@@ -330,7 +503,7 @@ class _DashboardView extends StatelessWidget {
                           ),
                         ),
                         Transform.scale(
-                          scale: 1.15,
+                          scale: 1.1,
                           child: Switch(
                             value: state.isOn,
                             onChanged: (v) => led.togglePower(v),
@@ -354,24 +527,31 @@ class _DashboardView extends StatelessWidget {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Row(
-                              children: [
-                                Icon(
-                                  Icons.brightness_6_rounded,
-                                  size: 20,
-                                  color: AppTheme.accentCyan,
-                                ),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Độ Sáng Dải LED',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 15,
-                                    color: AppTheme.textPrimary,
+                            const Expanded(
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.brightness_6_rounded,
+                                    size: 20,
+                                    color: AppTheme.accentCyan,
                                   ),
-                                ),
-                              ],
+                                  SizedBox(width: 8),
+                                  Flexible(
+                                    child: Text(
+                                      'Độ Sáng Dải LED',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 15,
+                                        color: AppTheme.textPrimary,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
+                            const SizedBox(width: 8),
                             Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 12,
@@ -417,31 +597,36 @@ class _DashboardView extends StatelessWidget {
                         ),
                         const SizedBox(height: 8),
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [25, 50, 75, 100].map((b) {
                             final isSel = state.brightness == b;
-                            return GestureDetector(
-                              onTap: () => led.setBrightness(b),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: isSel
-                                      ? AppTheme.accentCyan.withValues(alpha: 0.25)
-                                      : Colors.white.withValues(alpha: 0.06),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: isSel
-                                        ? AppTheme.accentCyan
-                                        : Colors.white.withValues(alpha: 0.12),
-                                    width: isSel ? 1.5 : 1,
-                                  ),
-                                ),
-                                child: Text(
-                                  '$b%',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
-                                    color: isSel ? AppTheme.accentCyan : AppTheme.textSecondary,
+                            return Expanded(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 4),
+                                child: GestureDetector(
+                                  onTap: () => led.setBrightness(b),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 6),
+                                    alignment: Alignment.center,
+                                    decoration: BoxDecoration(
+                                      color: isSel
+                                          ? AppTheme.accentCyan.withValues(alpha: 0.25)
+                                          : Colors.white.withValues(alpha: 0.06),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: isSel
+                                            ? AppTheme.accentCyan
+                                            : Colors.white.withValues(alpha: 0.12),
+                                        width: isSel ? 1.5 : 1,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      '$b%',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
+                                        color: isSel ? AppTheme.accentCyan : AppTheme.textSecondary,
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),
@@ -466,7 +651,7 @@ class _DashboardView extends StatelessWidget {
 
                   // Scene Modes Horizontal Carousel
                   SizedBox(
-                    height: 104,
+                    height: 116,
                     child: ListView(
                       scrollDirection: Axis.horizontal,
                       children: [
@@ -552,7 +737,7 @@ class _DashboardView extends StatelessWidget {
                     crossAxisCount: isTablet ? 4 : 2,
                     mainAxisSpacing: 12,
                     crossAxisSpacing: 12,
-                    childAspectRatio: isTablet ? 1.6 : 1.55,
+                    childAspectRatio: isTablet ? 1.55 : 1.38,
                     children: [
                       _ActionCard3D(
                         icon: Icons.palette_rounded,
@@ -598,7 +783,7 @@ class _DashboardView extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   SizedBox(
-                    height: 68,
+                    height: 78,
                     child: ListView(
                       scrollDirection: Axis.horizontal,
                       children: [
@@ -683,7 +868,7 @@ class _ActionCard3D extends StatelessWidget {
   Widget build(BuildContext context) {
     return LiquidGlassCard(
       borderRadius: 20,
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(12),
       tintColor: glowColor,
       onTap: onTap,
       child: Column(
@@ -694,8 +879,8 @@ class _ActionCard3D extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                width: 38,
-                height: 38,
+                width: 36,
+                height: 36,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
                   color: glowColor.withValues(alpha: 0.18),
@@ -715,7 +900,7 @@ class _ActionCard3D extends StatelessWidget {
                   child: Icon(
                     icon,
                     color: glowColor,
-                    size: 20,
+                    size: 19,
                   ),
                 ),
               ),
@@ -726,15 +911,17 @@ class _ActionCard3D extends StatelessWidget {
               ),
             ],
           ),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: AppTheme.textPrimary,
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-              letterSpacing: -0.2,
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: AppTheme.textPrimary,
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+                letterSpacing: -0.2,
+              ),
             ),
           ),
         ],
@@ -762,6 +949,7 @@ class _GemstoneColor3D extends StatelessWidget {
       child: Container(
         margin: const EdgeInsets.only(right: 14),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
               width: 44,
@@ -795,6 +983,8 @@ class _GemstoneColor3D extends StatelessWidget {
             const SizedBox(height: 5),
             Text(
               label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
@@ -827,7 +1017,7 @@ class _SceneCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 154,
+      width: 156,
       margin: const EdgeInsets.only(right: 12),
       child: LiquidGlassCard(
         borderRadius: 18,
@@ -860,28 +1050,33 @@ class _SceneCard extends StatelessWidget {
                 ),
               ],
             ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.textPrimary,
+            Flexible(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textPrimary,
+                    ),
                   ),
-                ),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    color: color.withValues(alpha: 0.95),
-                    fontWeight: FontWeight.w600,
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      color: color.withValues(alpha: 0.95),
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
         ),
@@ -924,8 +1119,8 @@ class _GlowingBulb3DState extends State<_GlowingBulb3D>
   Widget build(BuildContext context) {
     if (!widget.isOn) {
       return Container(
-        width: 62,
-        height: 62,
+        width: 58,
+        height: 58,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           gradient: LinearGradient(
@@ -942,7 +1137,7 @@ class _GlowingBulb3DState extends State<_GlowingBulb3D>
         child: const Icon(
           Icons.lightbulb_outline_rounded,
           color: AppTheme.textSecondary,
-          size: 32,
+          size: 30,
         ),
       );
     }
@@ -956,8 +1151,8 @@ class _GlowingBulb3DState extends State<_GlowingBulb3D>
         final glowAlpha = 0.45 + (t * 0.30);
 
         return Container(
-          width: 62,
-          height: 62,
+          width: 58,
+          height: 58,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             gradient: LinearGradient(
@@ -983,7 +1178,7 @@ class _GlowingBulb3DState extends State<_GlowingBulb3D>
           child: const Icon(
             Icons.lightbulb_rounded,
             color: Colors.white,
-            size: 32,
+            size: 30,
           ),
         );
       },

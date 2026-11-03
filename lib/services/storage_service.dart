@@ -29,7 +29,14 @@ class StorageService {
     final prefs = await SharedPreferences.getInstance();
     final data = prefs.getString(_mqttConfigKey);
     if (data != null) {
-      return MqttConfig.fromJson(jsonDecode(data));
+      final loaded = MqttConfig.fromJson(jsonDecode(data));
+      // Auto-migrate legacy default test.mosquitto.org to broker.hivemq.com (used by ESP32 firmware)
+      if (loaded.broker == 'test.mosquitto.org') {
+        final migrated = loaded.copyWith(broker: 'broker.hivemq.com');
+        await saveMqttConfig(migrated);
+        return migrated;
+      }
+      return loaded;
     }
     return const MqttConfig();
   }
@@ -68,7 +75,7 @@ class StorageService {
 
   Future<int> loadNumLeds() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getInt(_numLedsKey) ?? 30;
+    return prefs.getInt(_numLedsKey) ?? 8;
   }
 
   Future<void> saveVoiceEnabled(bool enabled) async {
@@ -103,8 +110,7 @@ class StorageService {
   }
 
   Future<bool> loadWyomingEnabled() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(_wyomingEnabledKey) ?? false;
+    return false;
   }
 
   Future<void> saveVieNeuTtsConfig({
@@ -121,13 +127,12 @@ class StorageService {
   }
 
   Future<bool> loadVieNeuTtsEnabled() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(_vieneuTtsEnabledKey) ?? false;
+    return false;
   }
 
   Future<String> loadVieNeuTtsUrl() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_vieneuTtsUrlKey) ?? 'http://192.168.1.100:23333/v1';
+    return prefs.getString(_vieneuTtsUrlKey) ?? '';
   }
 
   Future<String> loadVieNeuTtsVoice() async {

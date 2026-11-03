@@ -7,7 +7,7 @@ class MqttConfig {
   final String topicPrefix;
 
   const MqttConfig({
-    this.broker = 'test.mosquitto.org',
+    this.broker = 'broker.hivemq.com',
     this.port = 1883,
     this.username = '',
     this.password = '',
@@ -33,13 +33,14 @@ class MqttConfig {
     );
   }
 
-  // Topic helpers
+  // Topic helpers matching esp32_firmware/smart_led_esp32/smart_led_esp32.ino
   String get colorTopic => '$topicPrefix/color';
   String get brightnessTopic => '$topicPrefix/brightness';
   String get effectTopic => '$topicPrefix/effect';
   String get powerTopic => '$topicPrefix/power';
   String get sensorLightTopic => '$topicPrefix/sensor/light';
   String get sensorMotionTopic => '$topicPrefix/sensor/motion';
+  String get sensorClimateTopic => '$topicPrefix/sensor/climate';
   String get autoModeTopic => '$topicPrefix/auto_mode';
   String get numLedsTopic => '$topicPrefix/num_leds';
 
@@ -53,7 +54,7 @@ class MqttConfig {
       };
 
   factory MqttConfig.fromJson(Map<String, dynamic> json) => MqttConfig(
-        broker: json['broker'] ?? 'test.mosquitto.org',
+        broker: json['broker'] ?? 'broker.hivemq.com',
         port: json['port'] ?? 1883,
         username: json['username'] ?? '',
         password: json['password'] ?? '',

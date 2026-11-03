@@ -38,14 +38,21 @@ class MqttService extends ChangeNotifier {
     notifyListeners();
 
     try {
+      _client?.disconnect();
+
+      final effectiveClientId = _config.clientId == 'smart_led_flutter'
+          ? 'smart_led_${DateTime.now().millisecondsSinceEpoch % 100000}'
+          : _config.clientId;
+
       _client = MqttServerClient.withPort(
         _config.broker,
-        _config.clientId,
+        effectiveClientId,
         _config.port,
       );
 
       _client!.logging(on: false);
       _client!.keepAlivePeriod = 30;
+      _client!.connectTimeoutPeriod = 5000;
       _client!.autoReconnect = true;
       _client!.resubscribeOnAutoReconnect = true;
       _client!.onConnected = _onConnected;
@@ -54,7 +61,7 @@ class MqttService extends ChangeNotifier {
       _client!.onAutoReconnected = _onAutoReconnected;
 
       final connMsg = MqttConnectMessage()
-          .withClientIdentifier(_config.clientId)
+          .withClientIdentifier(effectiveClientId)
           .startClean()
           .withWillQos(MqttQos.atMostOnce);
 
@@ -64,16 +71,22 @@ class MqttService extends ChangeNotifier {
 
       _client!.connectionMessage = connMsg;
 
-      await _client!.connect();
+      await _client!.connect().timeout(const Duration(seconds: 6));
 
       if (_client!.connectionStatus?.state ==
           MqttConnectionState.connected) {
         _connectionState = AppConnectionState.connected;
         _setupMessageListener();
+      } else {
+        _connectionState = AppConnectionState.error;
+        _errorMessage =
+            'Không thể kết nối tới ${_config.broker}:${_config.port}';
+        _client?.disconnect();
       }
     } catch (e) {
       _connectionState = AppConnectionState.error;
       _errorMessage = e.toString();
+      _client?.disconnect();
       debugPrint('MQTT Connection Error: $e');
     }
 
@@ -147,7 +160,9 @@ class MqttService extends ChangeNotifier {
 
   void _onDisconnected() {
     debugPrint('MQTT Disconnected');
-    _connectionState = AppConnectionState.disconnected;
+    if (_connectionState != AppConnectionState.error) {
+      _connectionState = AppConnectionState.disconnected;
+    }
     notifyListeners();
   }
 

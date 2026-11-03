@@ -76,8 +76,8 @@ class SensorScreen extends StatelessWidget {
               child: Row(
                 children: [
                   Container(
-                    width: 50,
-                    height: 50,
+                    width: 48,
+                    height: 48,
                     decoration: BoxDecoration(
                       color: led.autoMode
                           ? AppTheme.accentGreen.withValues(alpha: 0.25)
@@ -94,16 +94,18 @@ class SensorScreen extends StatelessWidget {
                       color: led.autoMode
                           ? AppTheme.accentGreen
                           : AppTheme.textSecondary,
-                      size: 26,
+                      size: 24,
                     ),
                   ),
-                  const SizedBox(width: 14),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
                           'Chế độ cảm biến thông minh',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontWeight: FontWeight.w700,
                             fontSize: 15,
@@ -115,6 +117,8 @@ class SensorScreen extends StatelessWidget {
                           led.autoMode
                               ? 'Tự động chỉnh độ sáng & bật khi có người'
                               : 'Đang tắt tự động (chế độ điều khiển thủ công)',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             color: AppTheme.textSecondary,
                             fontSize: 12,
@@ -124,7 +128,7 @@ class SensorScreen extends StatelessWidget {
                     ),
                   ),
                   Transform.scale(
-                    scale: 1.15,
+                    scale: 1.08,
                     child: Switch(
                       value: led.autoMode,
                       onChanged: (v) => led.setAutoMode(v),
@@ -158,21 +162,24 @@ class SensorScreen extends StatelessWidget {
                 child: history.isEmpty
                     ? const Center(
                         child: Column(
+                          mainAxisSize: MainAxisSize.min,
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(
                               Icons.show_chart_rounded,
                               color: AppTheme.textTertiary,
-                              size: 44,
+                              size: 40,
                             ),
                             SizedBox(height: 10),
-                            Text(
-                              'Đang chờ dữ liệu cảm biến từ ESP32...\nHãy kiểm tra kết nối MQTT trong phần Cài đặt',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: AppTheme.textTertiary,
-                                fontSize: 13,
-                                height: 1.4,
+                            Flexible(
+                              child: Text(
+                                'Đang chờ dữ liệu cảm biến từ ESP32...\nHãy kiểm tra kết nối MQTT trong phần Cài đặt',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: AppTheme.textTertiary,
+                                  fontSize: 13,
+                                  height: 1.4,
+                                ),
                               ),
                             ),
                           ],
@@ -266,12 +273,16 @@ class SensorScreen extends StatelessWidget {
                         color: AppTheme.accentCyan,
                       ),
                       SizedBox(width: 8),
-                      Text(
-                        'Cơ Chế Hoạt Động Cảm Biến',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
-                          color: AppTheme.accentCyan,
+                      Expanded(
+                        child: Text(
+                          'Cơ Chế Hoạt Động Cảm Biến',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                            color: AppTheme.accentCyan,
+                          ),
                         ),
                       ),
                     ],
@@ -322,7 +333,7 @@ class _SensorCard3D extends StatelessWidget {
   Widget build(BuildContext context) {
     return LiquidGlassCard(
       borderRadius: 22,
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       tintColor: accentColor,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -331,8 +342,8 @@ class _SensorCard3D extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                width: 40,
-                height: 40,
+                width: 38,
+                height: 38,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(13),
                   color: accentColor.withValues(alpha: 0.18),
@@ -349,45 +360,52 @@ class _SensorCard3D extends StatelessWidget {
                   ],
                 ),
                 child: Center(
-                  child: Icon(icon, color: accentColor, size: 20),
+                  child: Icon(icon, color: accentColor, size: 19),
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                decoration: BoxDecoration(
-                  color: accentColor.withValues(alpha: 0.16),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: accentColor.withValues(alpha: 0.35),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: accentColor.withValues(alpha: 0.16),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: accentColor.withValues(alpha: 0.35),
+                    ),
                   ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: accentColor,
-                        boxShadow: [
-                          BoxShadow(
-                            color: accentColor.withValues(alpha: 0.8),
-                            blurRadius: 5,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: accentColor,
+                          boxShadow: [
+                            BoxShadow(
+                              color: accentColor.withValues(alpha: 0.8),
+                              blurRadius: 5,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                      Flexible(
+                        child: Text(
+                          'Live',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: accentColor,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
                           ),
-                        ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 5),
-                    Text(
-                      'Live',
-                      style: TextStyle(
-                        color: accentColor,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -395,6 +413,8 @@ class _SensorCard3D extends StatelessWidget {
           const SizedBox(height: 14),
           Text(
             label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               color: AppTheme.textSecondary,
               fontSize: 12,
@@ -402,13 +422,17 @@ class _SensorCard3D extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          Text(
-            value,
-            style: TextStyle(
-              color: accentColor,
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.3,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              style: TextStyle(
+                color: accentColor,
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.3,
+              ),
             ),
           ),
           const SizedBox(height: 2),
