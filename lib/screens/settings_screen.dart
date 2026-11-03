@@ -351,13 +351,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             ),
                             decoration: BoxDecoration(
                               color: isSelected
-                                  ? AppTheme.accentCyan.withValues(alpha: 0.25)
-                                  : Colors.white.withValues(alpha: 0.08),
+                                  ? AppTheme.accentCyan
+                                  : const Color(0xFFF1F5F9),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
                                 color: isSelected
                                     ? AppTheme.accentCyan
-                                    : Colors.white.withValues(alpha: 0.18),
+                                    : const Color(0xFFCBD5E1),
                                 width: isSelected ? 1.5 : 1,
                               ),
                             ),
@@ -370,7 +370,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                       : Icons.memory_rounded,
                                   size: 14,
                                   color: isSelected
-                                      ? AppTheme.accentCyan
+                                      ? Colors.white
                                       : AppTheme.textSecondary,
                                 ),
                                 const SizedBox(width: 6),
@@ -679,26 +679,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
           fontSize: 13,
         ),
         hintText: hint,
-        hintStyle: TextStyle(
-          color: Colors.white.withValues(alpha: 0.25),
+        hintStyle: const TextStyle(
+          color: AppTheme.textTertiary,
           fontSize: 13,
         ),
         prefixIcon: Icon(icon, size: 20, color: iconColor),
         suffixIcon: suffixIcon,
         filled: true,
-        fillColor: Colors.black.withValues(alpha: 0.25),
+        fillColor: const Color(0xFFF8FAFC),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(
-            color: Colors.white.withValues(alpha: 0.12),
+          borderSide: const BorderSide(
+            color: Color(0xFFCBD5E1),
           ),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide(
             color: iconColor,
-            width: 1.5,
+            width: 1.6,
           ),
         ),
       ),

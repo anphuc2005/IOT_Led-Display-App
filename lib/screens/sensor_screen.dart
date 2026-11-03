@@ -106,13 +106,13 @@ class SensorScreen extends StatelessWidget {
                     height: 48,
                     decoration: BoxDecoration(
                       color: led.autoMode
-                          ? AppTheme.accentGreen.withValues(alpha: 0.25)
-                          : Colors.white.withValues(alpha: 0.1),
+                          ? AppTheme.accentGreen.withValues(alpha: 0.14)
+                          : const Color(0xFFF1F5F9),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
                         color: led.autoMode
                             ? AppTheme.accentGreen.withValues(alpha: 0.5)
-                            : Colors.white.withValues(alpha: 0.2),
+                            : const Color(0xFFCBD5E1),
                       ),
                     ),
                     child: Icon(
@@ -218,8 +218,8 @@ class SensorScreen extends StatelessWidget {
                             show: true,
                             drawVerticalLine: false,
                             horizontalInterval: 200,
-                            getDrawingHorizontalLine: (value) => FlLine(
-                              color: Colors.white.withValues(alpha: 0.08),
+                            getDrawingHorizontalLine: (value) => const FlLine(
+                              color: Color(0xFFE2E8F0),
                               strokeWidth: 1,
                             ),
                           ),

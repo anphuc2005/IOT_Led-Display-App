@@ -200,13 +200,13 @@ class EffectsScreen extends StatelessWidget {
                   SliderTheme(
                     data: SliderThemeData(
                       activeTrackColor: AppTheme.accentPurple,
-                      inactiveTrackColor: Colors.white.withValues(alpha: 0.12),
-                      thumbColor: Colors.white,
-                      overlayColor: AppTheme.accentPurple.withValues(alpha: 0.2),
+                      inactiveTrackColor: const Color(0xFFE2E8F0),
+                      thumbColor: AppTheme.accentPurple,
+                      overlayColor: AppTheme.accentPurple.withValues(alpha: 0.16),
                       trackHeight: 6,
                       thumbShape: const RoundSliderThumbShape(
                         enabledThumbRadius: 9,
-                        elevation: 4,
+                        elevation: 3,
                       ),
                     ),
                     child: Slider(
@@ -266,13 +266,13 @@ class EffectsScreen extends StatelessWidget {
                               alignment: Alignment.center,
                               decoration: BoxDecoration(
                                 color: isSel
-                                    ? AppTheme.accentPurple.withValues(alpha: 0.28)
-                                    : Colors.white.withValues(alpha: 0.06),
+                                    ? AppTheme.accentPurple
+                                    : const Color(0xFFF1F5F9),
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
                                   color: isSel
                                       ? AppTheme.accentPurple
-                                      : Colors.white.withValues(alpha: 0.12),
+                                      : const Color(0xFFCBD5E1),
                                   width: isSel ? 1.5 : 1,
                                 ),
                               ),
@@ -285,7 +285,7 @@ class EffectsScreen extends StatelessWidget {
                                     fontWeight:
                                         isSel ? FontWeight.w800 : FontWeight.w600,
                                     color: isSel
-                                        ? AppTheme.accentPurple
+                                        ? Colors.white
                                         : AppTheme.textSecondary,
                                   ),
                                 ),
@@ -532,10 +532,10 @@ class _Ws2812StripSimulatorState extends State<_Ws2812StripSimulator>
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.08),
+                  color: const Color(0xFFF1F5F9),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.15),
+                    color: const Color(0xFFCBD5E1),
                   ),
                 ),
                 child: Row(
@@ -723,20 +723,20 @@ class _LiquidEffectCard extends StatelessWidget {
                 height: 36,
                 decoration: BoxDecoration(
                   color: isSelected
-                      ? themeColor.withValues(alpha: 0.28)
-                      : Colors.white.withValues(alpha: 0.08),
+                      ? themeColor
+                      : themeColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color: isSelected
-                        ? themeColor.withValues(alpha: 0.6)
-                        : Colors.white.withValues(alpha: 0.18),
+                        ? themeColor
+                        : themeColor.withValues(alpha: 0.35),
                     width: 1.1,
                   ),
                   boxShadow: isSelected
                       ? [
                           BoxShadow(
-                            color: themeColor.withValues(alpha: 0.35),
-                            blurRadius: 10,
+                            color: themeColor.withValues(alpha: 0.25),
+                            blurRadius: 8,
                             offset: const Offset(0, 2),
                           ),
                         ]
@@ -757,10 +757,10 @@ class _LiquidEffectCard extends StatelessWidget {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                     decoration: BoxDecoration(
-                      color: themeColor.withValues(alpha: 0.22),
+                      color: themeColor.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: themeColor.withValues(alpha: 0.5),
+                        color: themeColor.withValues(alpha: 0.45),
                       ),
                     ),
                     child: Row(
@@ -772,12 +772,6 @@ class _LiquidEffectCard extends StatelessWidget {
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: themeColor,
-                            boxShadow: [
-                              BoxShadow(
-                                color: themeColor.withValues(alpha: 0.8),
-                                blurRadius: 4,
-                              ),
-                            ],
                           ),
                         ),
                         const SizedBox(width: 4),
@@ -798,10 +792,10 @@ class _LiquidEffectCard extends StatelessWidget {
                   ),
                 )
               else
-                Icon(
+                const Icon(
                   Icons.arrow_forward_ios_rounded,
                   size: 11,
-                  color: Colors.white.withValues(alpha: 0.2),
+                  color: AppTheme.textTertiary,
                 ),
             ],
           ),
@@ -816,8 +810,8 @@ class _LiquidEffectCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: isSelected ? Colors.white : AppTheme.textPrimary,
-                    fontWeight: FontWeight.w700,
+                    color: isSelected ? themeColor : AppTheme.textPrimary,
+                    fontWeight: FontWeight.w800,
                     fontSize: 13.5,
                     letterSpacing: -0.2,
                   ),
@@ -828,10 +822,8 @@ class _LiquidEffectCard extends StatelessWidget {
                     effect.description,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: isSelected
-                          ? Colors.white.withValues(alpha: 0.85)
-                          : AppTheme.textSecondary,
+                    style: const TextStyle(
+                      color: AppTheme.textSecondary,
                       fontSize: 11,
                       height: 1.2,
                     ),

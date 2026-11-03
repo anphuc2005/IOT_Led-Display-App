@@ -239,13 +239,13 @@ class _ColorPickerScreenState extends State<ColorPickerScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
               color: _liveSync
-                  ? AppTheme.accentGreen.withValues(alpha: 0.18)
-                  : Colors.white.withValues(alpha: 0.08),
+                  ? AppTheme.accentGreen.withValues(alpha: 0.14)
+                  : const Color(0xFFF1F5F9),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
                 color: _liveSync
                     ? AppTheme.accentGreen.withValues(alpha: 0.45)
-                    : Colors.white.withValues(alpha: 0.15),
+                    : const Color(0xFFCBD5E1),
               ),
             ),
             child: Row(
@@ -364,10 +364,10 @@ class _ColorPickerScreenState extends State<ColorPickerScreen> {
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.1),
+                              color: const Color(0xFFF1F5F9),
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.2),
+                                color: const Color(0xFFCBD5E1),
                               ),
                             ),
                             child: Row(
@@ -396,9 +396,9 @@ class _ColorPickerScreenState extends State<ColorPickerScreen> {
                       spacing: 6,
                       runSpacing: 4,
                       children: [
-                        _buildRgbPill('R', _r, const Color(0xFFFF2D55)),
-                        _buildRgbPill('G', _g, const Color(0xFF00F5D4)),
-                        _buildRgbPill('B', _b, const Color(0xFF38BDF8)),
+                        _buildRgbPill('R', _r, AppTheme.accentRed),
+                        _buildRgbPill('G', _g, AppTheme.accentGreen),
+                        _buildRgbPill('B', _b, AppTheme.accentBlue),
                       ],
                     ),
                   ],
@@ -508,9 +508,9 @@ class _ColorPickerScreenState extends State<ColorPickerScreen> {
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.06),
+        color: const Color(0xFFF1F5F9),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+        border: Border.all(color: const Color(0xFFCBD5E1)),
       ),
       child: Row(
         children: tabs.asMap().entries.map((entry) {
@@ -527,15 +527,9 @@ class _ColorPickerScreenState extends State<ColorPickerScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 9),
                 decoration: BoxDecoration(
                   color: isSelected
-                      ? AppTheme.accentCyan.withValues(alpha: 0.25)
+                      ? AppTheme.accentCyan
                       : Colors.transparent,
                   borderRadius: BorderRadius.circular(12),
-                  border: isSelected
-                      ? Border.all(
-                          color: AppTheme.accentCyan.withValues(alpha: 0.5),
-                          width: 1.1,
-                        )
-                      : null,
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -543,7 +537,7 @@ class _ColorPickerScreenState extends State<ColorPickerScreen> {
                     Icon(
                       tab['icon'] as IconData,
                       size: 14,
-                      color: isSelected ? AppTheme.accentCyan : AppTheme.textSecondary,
+                      color: isSelected ? Colors.white : AppTheme.textSecondary,
                     ),
                     const SizedBox(width: 4),
                     Flexible(
@@ -554,7 +548,7 @@ class _ColorPickerScreenState extends State<ColorPickerScreen> {
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                          color: isSelected ? AppTheme.textPrimary : AppTheme.textSecondary,
+                          color: isSelected ? Colors.white : AppTheme.textSecondary,
                         ),
                       ),
                     ),
@@ -613,9 +607,9 @@ class _ColorPickerScreenState extends State<ColorPickerScreen> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.08),
+                    color: const Color(0xFFF1F5F9),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+                    border: Border.all(color: const Color(0xFFCBD5E1)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -751,12 +745,12 @@ class _ColorPickerScreenState extends State<ColorPickerScreen> {
 
           SliderTheme(
             data: SliderThemeData(
-              activeTrackColor: const Color(0xFFFFB464),
-              inactiveTrackColor: Colors.white.withValues(alpha: 0.12),
-              thumbColor: Colors.white,
-              overlayColor: const Color(0xFFFFB464).withValues(alpha: 0.2),
+              activeTrackColor: AppTheme.accentOrange,
+              inactiveTrackColor: const Color(0xFFE2E8F0),
+              thumbColor: AppTheme.accentOrange,
+              overlayColor: AppTheme.accentOrange.withValues(alpha: 0.16),
               trackHeight: 6,
-              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 9, elevation: 4),
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 9, elevation: 3),
             ),
             child: Slider(
               value: _kelvin,
@@ -795,12 +789,12 @@ class _ColorPickerScreenState extends State<ColorPickerScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
                   decoration: BoxDecoration(
                     color: isSel
-                        ? previewColor.withValues(alpha: 0.22)
-                        : Colors.white.withValues(alpha: 0.05),
+                        ? AppTheme.accentOrange.withValues(alpha: 0.10)
+                        : const Color(0xFFF8FAFC),
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: isSel ? previewColor : Colors.white.withValues(alpha: 0.12),
-                      width: isSel ? 1.5 : 1,
+                      color: isSel ? AppTheme.accentOrange : const Color(0xFFCBD5E1),
+                      width: isSel ? 1.6 : 1,
                     ),
                   ),
                   child: Row(
@@ -811,7 +805,7 @@ class _ColorPickerScreenState extends State<ColorPickerScreen> {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: previewColor,
-                          border: Border.all(color: Colors.white.withValues(alpha: 0.5)),
+                          border: Border.all(color: const Color(0xFF94A3B8), width: 1.2),
                           boxShadow: [
                             BoxShadow(
                               color: previewColor.withValues(alpha: 0.5),
@@ -822,7 +816,7 @@ class _ColorPickerScreenState extends State<ColorPickerScreen> {
                         child: Icon(
                           preset['icon'] as IconData,
                           size: 16,
-                          color: kVal < 4500 ? const Color(0xFF1E293B) : Colors.black87,
+                          color: const Color(0xFF0F172A),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -837,16 +831,16 @@ class _ColorPickerScreenState extends State<ColorPickerScreen> {
                               style: TextStyle(
                                 fontWeight: FontWeight.w700,
                                 fontSize: 13,
-                                color: isSel ? Colors.white : AppTheme.textPrimary,
+                                color: isSel ? AppTheme.accentOrange : AppTheme.textPrimary,
                               ),
                             ),
                             Text(
                               preset['desc'] as String,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 11,
-                                color: isSel ? previewColor : AppTheme.textSecondary,
+                                color: AppTheme.textSecondary,
                               ),
                             ),
                           ],
@@ -857,7 +851,7 @@ class _ColorPickerScreenState extends State<ColorPickerScreen> {
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w800,
-                          color: isSel ? previewColor : AppTheme.textSecondary,
+                          color: isSel ? AppTheme.accentOrange : AppTheme.textSecondary,
                         ),
                       ),
                     ],
@@ -906,7 +900,7 @@ class _ColorPickerScreenState extends State<ColorPickerScreen> {
           _buildRgbSliderRow(
             label: 'Red',
             value: _r.toDouble(),
-            color: const Color(0xFFFF2D55),
+            color: AppTheme.accentRed,
             onChanged: (v) => _onColorChanged(Color.fromARGB(255, v.toInt(), _g, _b)),
           ),
           const SizedBox(height: 12),
@@ -914,7 +908,7 @@ class _ColorPickerScreenState extends State<ColorPickerScreen> {
           _buildRgbSliderRow(
             label: 'Green',
             value: _g.toDouble(),
-            color: const Color(0xFF00F5D4),
+            color: AppTheme.accentGreen,
             onChanged: (v) => _onColorChanged(Color.fromARGB(255, _r, v.toInt(), _b)),
           ),
           const SizedBox(height: 12),
@@ -922,7 +916,7 @@ class _ColorPickerScreenState extends State<ColorPickerScreen> {
           _buildRgbSliderRow(
             label: 'Blue',
             value: _b.toDouble(),
-            color: const Color(0xFF38BDF8),
+            color: AppTheme.accentBlue,
             onChanged: (v) => _onColorChanged(Color.fromARGB(255, _r, _g, v.toInt())),
           ),
           const SizedBox(height: 16),
@@ -1205,30 +1199,24 @@ class _ColorPickerScreenState extends State<ColorPickerScreen> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.18),
+                    color: isSel
+                        ? AppTheme.accentCyan.withValues(alpha: 0.12)
+                        : const Color(0xFFF8FAFC),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: isSel ? Colors.white : color.withValues(alpha: 0.45),
-                      width: isSel ? 1.8 : 1,
+                      color: isSel ? AppTheme.accentCyan : const Color(0xFFCBD5E1),
+                      width: isSel ? 1.8 : 1.1,
                     ),
-                    boxShadow: isSel
-                        ? [
-                            BoxShadow(
-                              color: color.withValues(alpha: 0.6),
-                              blurRadius: 8,
-                            ),
-                          ]
-                        : null,
                   ),
                   child: Row(
                     children: [
                       Container(
-                        width: 14,
-                        height: 14,
+                        width: 16,
+                        height: 16,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: color,
-                          border: Border.all(color: Colors.white.withValues(alpha: 0.6)),
+                          border: Border.all(color: const Color(0xFF64748B), width: 1.2),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -1240,7 +1228,7 @@ class _ColorPickerScreenState extends State<ColorPickerScreen> {
                           style: TextStyle(
                             fontSize: 11.5,
                             fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
-                            color: isSel ? Colors.white : AppTheme.textPrimary,
+                            color: isSel ? AppTheme.accentCyan : AppTheme.textPrimary,
                           ),
                         ),
                       ),

@@ -965,7 +965,7 @@ class _AiChatScreenState extends State<AiChatScreen>
   void _showModelSelectorSheet() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF0C111E),
+      backgroundColor: Colors.white,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
@@ -989,7 +989,7 @@ class _AiChatScreenState extends State<AiChatScreen>
                           width: 44,
                           height: 4,
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.25),
+                            color: const Color(0xFFCBD5E1),
                             borderRadius: BorderRadius.circular(2),
                           ),
                         ),
@@ -1118,15 +1118,15 @@ class _AiChatScreenState extends State<AiChatScreen>
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
                                   color: isCurrent
-                                      ? AppTheme.accentCyan.withValues(alpha: 0.15)
-                                      : Colors.white.withValues(alpha: 0.05),
+                                      ? AppTheme.accentCyan.withValues(alpha: 0.12)
+                                      : const Color(0xFFF8FAFC),
                                   borderRadius: BorderRadius.circular(14),
                                   border: Border.all(
                                     color: isCurrent
                                         ? AppTheme.accentCyan
                                         : (onCooldown
                                             ? AppTheme.accentOrange.withValues(alpha: 0.5)
-                                            : Colors.white.withValues(alpha: 0.12)),
+                                            : const Color(0xFFCBD5E1)),
                                     width: isCurrent ? 1.5 : 1,
                                   ),
                                 ),
@@ -1339,17 +1339,17 @@ class _AiChatScreenState extends State<AiChatScreen>
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
               decoration: BoxDecoration(
-                color: const Color(0xFF111827).withValues(alpha: 0.92),
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(28),
                 border: Border.all(
                   color: _isListening
-                      ? AppTheme.accentRed.withValues(alpha: 0.65)
-                      : Colors.white.withValues(alpha: 0.14),
-                  width: 1.2,
+                      ? AppTheme.accentRed
+                      : const Color(0xFFCBD5E1),
+                  width: 1.3,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.35),
+                    color: const Color(0xFF0F172A).withValues(alpha: 0.09),
                     blurRadius: 16,
                     offset: const Offset(0, 6),
                   ),
@@ -1371,22 +1371,22 @@ class _AiChatScreenState extends State<AiChatScreen>
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                                 colors: [
-                                  Color(0xFF1E293B),
-                                  Color(0xFF0F172A),
+                                  Color(0xFFF0FDFA),
+                                  Color(0xFFE0F2FE),
                                 ],
                               ),
                         shape: BoxShape.circle,
                         border: Border.all(
                           color: _isListening
-                              ? Colors.white.withValues(alpha: 0.7)
-                              : AppTheme.accentCyan.withValues(alpha: 0.45),
+                              ? AppTheme.accentRed
+                              : AppTheme.accentCyan.withValues(alpha: 0.55),
                           width: 1.2,
                         ),
                         boxShadow: _isListening
                             ? [
                                 BoxShadow(
                                   color:
-                                      AppTheme.accentRed.withValues(alpha: 0.5),
+                                      AppTheme.accentRed.withValues(alpha: 0.35),
                                   blurRadius: 12,
                                   spreadRadius: 1,
                                 ),
@@ -1409,13 +1409,14 @@ class _AiChatScreenState extends State<AiChatScreen>
                       style: const TextStyle(
                         color: AppTheme.textPrimary,
                         fontSize: 14,
+                        fontWeight: FontWeight.w500,
                       ),
                       decoration: InputDecoration(
                         hintText: _isListening
                             ? 'Đang thu giọng nói tiếng Việt...'
                             : 'Nhắn tin hoặc chạm 🎙️ để nói...',
-                        hintStyle: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.38),
+                        hintStyle: const TextStyle(
+                          color: AppTheme.textTertiary,
                           fontSize: 13.5,
                         ),
                         border: InputBorder.none,
@@ -1600,25 +1601,30 @@ class _AiChatScreenState extends State<AiChatScreen>
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
                   color: isOn
-                      ? ledColor.withValues(alpha: 0.18)
-                      : Colors.white.withValues(alpha: 0.06),
+                      ? AppTheme.accentGreen.withValues(alpha: 0.1)
+                      : const Color(0xFFF1F5F9),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color: isOn
-                        ? ledColor.withValues(alpha: 0.7)
-                        : Colors.white.withValues(alpha: 0.15),
+                        ? AppTheme.accentGreen.withValues(alpha: 0.55)
+                        : const Color(0xFFCBD5E1),
                     width: 1.2,
                   ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      isOn
-                          ? Icons.lightbulb_rounded
-                          : Icons.lightbulb_outline_rounded,
-                      size: 15,
-                      color: isOn ? ledColor : AppTheme.textSecondary,
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: isOn ? ledColor : const Color(0xFF94A3B8),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: const Color(0xFF475569),
+                          width: 1,
+                        ),
+                      ),
                     ),
                     const SizedBox(width: 5),
                     Text(
@@ -1627,7 +1633,7 @@ class _AiChatScreenState extends State<AiChatScreen>
                         fontSize: 11.5,
                         fontWeight: FontWeight.w700,
                         color: isOn
-                            ? AppTheme.textPrimary
+                            ? AppTheme.accentGreen
                             : AppTheme.textSecondary,
                       ),
                     ),
@@ -1696,13 +1702,13 @@ class _AiChatScreenState extends State<AiChatScreen>
                         const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
                       color: isOn
-                          ? AppTheme.accentGreen.withValues(alpha: 0.2)
-                          : Colors.white.withValues(alpha: 0.08),
+                          ? AppTheme.accentGreen.withValues(alpha: 0.14)
+                          : const Color(0xFFF1F5F9),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
                         color: isOn
                             ? AppTheme.accentGreen
-                            : Colors.white.withValues(alpha: 0.2),
+                            : const Color(0xFFCBD5E1),
                       ),
                     ),
                     child: Row(
@@ -1793,7 +1799,7 @@ class _AiChatScreenState extends State<AiChatScreen>
                           color: preset,
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.65),
+                            color: const Color(0xFF64748B),
                             width: 1.4,
                           ),
                         ),
@@ -1977,7 +1983,7 @@ class _AiChatScreenState extends State<AiChatScreen>
         margin: const EdgeInsets.only(top: 10, right: 48),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: const Color(0xFF151F32).withValues(alpha: 0.9),
+          color: Colors.white,
           borderRadius: const BorderRadius.only(
             topLeft: Radius.circular(18),
             topRight: Radius.circular(18),
@@ -1985,8 +1991,15 @@ class _AiChatScreenState extends State<AiChatScreen>
             bottomRight: Radius.circular(18),
           ),
           border: Border.all(
-            color: AppTheme.accentCyan.withValues(alpha: 0.35),
+            color: AppTheme.accentCyan.withValues(alpha: 0.45),
           ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF0F172A).withValues(alpha: 0.06),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -2006,7 +2019,7 @@ class _AiChatScreenState extends State<AiChatScreen>
                 style: const TextStyle(
                   color: AppTheme.textPrimary,
                   fontSize: 13,
-                  fontWeight: FontWeight.w500,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
@@ -2139,14 +2152,12 @@ class _ChatBubbleState extends State<_ChatBubble> {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      Color(0xFF2563EB),
-                      Color(0xFF0891B2),
+                      Color(0xFF1E3A8A),
+                      Color(0xFF005A70),
                     ],
                   )
                 : null,
-            color: isUser
-                ? null
-                : const Color(0xFF151F32).withValues(alpha: 0.92),
+            color: isUser ? null : Colors.white,
             borderRadius: BorderRadius.only(
               topLeft: const Radius.circular(18),
               topRight: const Radius.circular(18),
@@ -2155,15 +2166,15 @@ class _ChatBubbleState extends State<_ChatBubble> {
             ),
             border: Border.all(
               color: isUser
-                  ? Colors.white.withValues(alpha: 0.22)
+                  ? const Color(0xFF1E3A8A)
                   : (widget.isSpeaking
-                      ? AppTheme.accentCyan.withValues(alpha: 0.7)
-                      : Colors.white.withValues(alpha: 0.1)),
-              width: widget.isSpeaking ? 1.4 : 1.0,
+                      ? AppTheme.accentCyan
+                      : const Color(0xFFCBD5E1)),
+              width: widget.isSpeaking ? 1.5 : 1.0,
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.2),
+                color: const Color(0xFF0F172A).withValues(alpha: 0.06),
                 blurRadius: 8,
                 offset: const Offset(0, 3),
               ),
@@ -2182,7 +2193,7 @@ class _ChatBubbleState extends State<_ChatBubble> {
                         : Icons.smart_toy_outlined,
                     size: 13,
                     color: isUser
-                        ? Colors.white.withValues(alpha: 0.85)
+                        ? Colors.white
                         : AppTheme.accentCyan,
                   ),
                   const SizedBox(width: 5),
@@ -2195,7 +2206,7 @@ class _ChatBubbleState extends State<_ChatBubble> {
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
                         color: isUser
-                            ? Colors.white.withValues(alpha: 0.9)
+                            ? Colors.white
                             : AppTheme.accentCyan,
                       ),
                     ),
@@ -2205,9 +2216,10 @@ class _ChatBubbleState extends State<_ChatBubble> {
                     _formatTime(widget.message.timestamp),
                     style: TextStyle(
                       fontSize: 10,
+                      fontWeight: FontWeight.w600,
                       color: isUser
-                          ? Colors.white.withValues(alpha: 0.65)
-                          : AppTheme.textSecondary.withValues(alpha: 0.8),
+                          ? Colors.white
+                          : AppTheme.textSecondary,
                     ),
                   ),
                 ],
@@ -2266,6 +2278,7 @@ class _ChatBubbleState extends State<_ChatBubble> {
                         style: const TextStyle(
                           color: AppTheme.textSecondary,
                           fontSize: 11,
+                          fontWeight: FontWeight.w600,
                           decoration: TextDecoration.underline,
                         ),
                       ),
@@ -2278,10 +2291,10 @@ class _ChatBubbleState extends State<_ChatBubble> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.4),
+                      color: const Color(0xFF0F172A),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: AppTheme.accentCyan.withValues(alpha: 0.3),
+                        color: const Color(0xFF334155),
                       ),
                     ),
                     child: Text(
@@ -2289,7 +2302,7 @@ class _ChatBubbleState extends State<_ChatBubble> {
                       style: const TextStyle(
                         fontFamily: 'monospace',
                         fontSize: 11,
-                        color: AppTheme.accentCyan,
+                        color: Color(0xFF7DD3FC),
                       ),
                     ),
                   ),
@@ -2314,13 +2327,13 @@ class _ChatBubbleState extends State<_ChatBubble> {
                         ),
                         decoration: BoxDecoration(
                           color: widget.isSpeaking
-                              ? AppTheme.accentCyan.withValues(alpha: 0.2)
-                              : Colors.white.withValues(alpha: 0.06),
+                              ? AppTheme.accentCyan.withValues(alpha: 0.14)
+                              : const Color(0xFFF1F5F9),
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
                             color: widget.isSpeaking
-                                ? AppTheme.accentCyan.withValues(alpha: 0.6)
-                                : Colors.white.withValues(alpha: 0.14),
+                                ? AppTheme.accentCyan
+                                : const Color(0xFFCBD5E1),
                           ),
                         ),
                         child: Row(
@@ -2347,7 +2360,7 @@ class _ChatBubbleState extends State<_ChatBubble> {
                                     : AppTheme.textSecondary,
                                 fontWeight: widget.isSpeaking
                                     ? FontWeight.w700
-                                    : FontWeight.w500,
+                                    : FontWeight.w600,
                               ),
                             ),
                           ],
@@ -2361,14 +2374,17 @@ class _ChatBubbleState extends State<_ChatBubble> {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.05),
+                          color: const Color(0xFFF1F5F9),
                           borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: const Color(0xFFE2E8F0),
+                          ),
                         ),
                         child: Text(
                           widget.message.modelUsed!,
                           style: const TextStyle(
                             fontSize: 10,
-                            fontWeight: FontWeight.w500,
+                            fontWeight: FontWeight.w600,
                             color: AppTheme.textSecondary,
                           ),
                         ),
@@ -2408,7 +2424,7 @@ class _ChatBubbleState extends State<_ChatBubble> {
           decoration: BoxDecoration(
             color: c,
             shape: BoxShape.circle,
-            border: Border.all(color: Colors.white, width: 1.2),
+            border: Border.all(color: const Color(0xFF475569), width: 1.2),
           ),
         );
         label = 'RGB($r, $g, $b)';
@@ -2492,18 +2508,25 @@ class _QuickChip extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
           decoration: BoxDecoration(
-            color: const Color(0xFF151F32).withValues(alpha: 0.85),
+            color: Colors.white,
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
-              color: AppTheme.accentCyan.withValues(alpha: 0.28),
+              color: const Color(0xFFCBD5E1),
             ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF0F172A).withValues(alpha: 0.05),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
           alignment: Alignment.center,
           child: Text(
             label,
             style: const TextStyle(
               fontSize: 12,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w700,
               color: AppTheme.textPrimary,
             ),
           ),
@@ -2536,10 +2559,10 @@ class _GlassIconButton extends StatelessWidget {
           width: 34,
           height: 34,
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.08),
+            color: const Color(0xFFF1F5F9),
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: Colors.white.withValues(alpha: 0.14),
+              color: const Color(0xFFCBD5E1),
               width: 1,
             ),
           ),

@@ -77,24 +77,17 @@ class _LiquidFloatingNavBar extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 8),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(34),
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Color(0x38FFFFFF),
-                    Color(0x10FFFFFF),
-                  ],
-                ),
+                color: Colors.white.withValues(alpha: 0.95),
                 border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.28),
-                  width: 1.2,
+                  color: const Color(0xFFCBD5E1),
+                  width: 1.3,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.45),
-                    blurRadius: 28,
-                    spreadRadius: -2,
-                    offset: const Offset(0, 12),
+                    color: const Color(0xFF0F172A).withValues(alpha: 0.10),
+                    blurRadius: 24,
+                    spreadRadius: 0,
+                    offset: const Offset(0, 8),
                   ),
                 ],
               ),
@@ -132,20 +125,11 @@ class _LiquidFloatingNavBar extends StatelessWidget {
           decoration: isSelected
               ? BoxDecoration(
                   borderRadius: BorderRadius.circular(24),
-                  gradient: LinearGradient(
-                    colors: [
-                      AppTheme.accentCyan.withValues(alpha: 0.35),
-                      AppTheme.accentBlue.withValues(alpha: 0.18),
-                    ],
-                  ),
-                  border: Border.all(
-                    color: AppTheme.accentCyan.withValues(alpha: 0.65),
-                    width: 1.1,
-                  ),
+                  color: AppTheme.accentCyan,
                   boxShadow: [
                     BoxShadow(
-                      color: AppTheme.accentCyan.withValues(alpha: 0.30),
-                      blurRadius: 14,
+                      color: AppTheme.accentCyan.withValues(alpha: 0.25),
+                      blurRadius: 10,
                       offset: const Offset(0, 2),
                     ),
                   ],
@@ -158,7 +142,7 @@ class _LiquidFloatingNavBar extends StatelessWidget {
               Icon(
                 icon,
                 size: 20,
-                color: isSelected ? AppTheme.accentCyan : AppTheme.textSecondary,
+                color: isSelected ? Colors.white : AppTheme.textSecondary,
               ),
               if (isSelected) ...[
                 const SizedBox(width: 5),
@@ -168,7 +152,7 @@ class _LiquidFloatingNavBar extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      color: AppTheme.textPrimary,
+                      color: Colors.white,
                       fontSize: 11.5,
                       fontWeight: FontWeight.w700,
                       letterSpacing: -0.2,
@@ -260,10 +244,10 @@ class _DashboardView extends StatelessWidget {
                             child: Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.12),
+                                color: Colors.white,
                                 borderRadius: BorderRadius.circular(16),
                                 border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.22),
+                                  color: const Color(0xFFCBD5E1),
                                 ),
                               ),
                               child: const Icon(
@@ -579,13 +563,13 @@ class _DashboardView extends StatelessWidget {
                         SliderTheme(
                           data: SliderThemeData(
                             activeTrackColor: AppTheme.accentCyan,
-                            inactiveTrackColor: Colors.white.withValues(alpha: 0.12),
-                            thumbColor: Colors.white,
-                            overlayColor: AppTheme.accentCyan.withValues(alpha: 0.2),
+                            inactiveTrackColor: const Color(0xFFE2E8F0),
+                            thumbColor: AppTheme.accentCyan,
+                            overlayColor: AppTheme.accentCyan.withValues(alpha: 0.16),
                             trackHeight: 7,
                             thumbShape: const RoundSliderThumbShape(
                               enabledThumbRadius: 10,
-                              elevation: 4,
+                              elevation: 3,
                             ),
                           ),
                           child: Slider(
@@ -609,13 +593,13 @@ class _DashboardView extends StatelessWidget {
                                     alignment: Alignment.center,
                                     decoration: BoxDecoration(
                                       color: isSel
-                                          ? AppTheme.accentCyan.withValues(alpha: 0.25)
-                                          : Colors.white.withValues(alpha: 0.06),
+                                          ? AppTheme.accentCyan
+                                          : const Color(0xFFF1F5F9),
                                       borderRadius: BorderRadius.circular(12),
                                       border: Border.all(
                                         color: isSel
                                             ? AppTheme.accentCyan
-                                            : Colors.white.withValues(alpha: 0.12),
+                                            : const Color(0xFFCBD5E1),
                                         width: isSel ? 1.5 : 1,
                                       ),
                                     ),
@@ -624,7 +608,7 @@ class _DashboardView extends StatelessWidget {
                                       style: TextStyle(
                                         fontSize: 12,
                                         fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
-                                        color: isSel ? AppTheme.accentCyan : AppTheme.textSecondary,
+                                        color: isSel ? Colors.white : AppTheme.textSecondary,
                                       ),
                                     ),
                                   ),
@@ -659,7 +643,7 @@ class _DashboardView extends StatelessWidget {
                           icon: Icons.menu_book_rounded,
                           label: 'Học bài & Làm việc',
                           subtitle: 'Trắng 80%',
-                          color: const Color(0xFFE2E8F0),
+                          color: AppTheme.accentBlue,
                           onTap: () {
                             if (!state.isOn) led.togglePower(true);
                             led.setColor(const Color(0xFFFFFFFF));
@@ -671,7 +655,7 @@ class _DashboardView extends StatelessWidget {
                           icon: Icons.coffee_rounded,
                           label: 'Thư giãn & Chill',
                           subtitle: 'Vàng ấm 45%',
-                          color: const Color(0xFFFFB703),
+                          color: AppTheme.accentOrange,
                           onTap: () {
                             if (!state.isOn) led.togglePower(true);
                             led.setColor(const Color(0xFFFFB464));
@@ -683,7 +667,7 @@ class _DashboardView extends StatelessWidget {
                           icon: Icons.movie_rounded,
                           label: 'Rạp phim tại gia',
                           subtitle: 'Tím dịu 25%',
-                          color: const Color(0xFFA855F7),
+                          color: AppTheme.accentPurple,
                           onTap: () {
                             if (!state.isOn) led.togglePower(true);
                             led.setColor(const Color(0xFF8A2BE2));
@@ -695,7 +679,7 @@ class _DashboardView extends StatelessWidget {
                           icon: Icons.nightlight_round,
                           label: 'Đèn ngủ êm dịu',
                           subtitle: 'Hổ phách 10%',
-                          color: const Color(0xFFFF8500),
+                          color: AppTheme.accentRed,
                           onTap: () {
                             if (!state.isOn) led.togglePower(true);
                             led.setColor(const Color(0xFFFF8500));
@@ -707,7 +691,7 @@ class _DashboardView extends StatelessWidget {
                           icon: Icons.celebration_rounded,
                           label: 'Sôi động Party',
                           subtitle: 'Cầu vồng 100%',
-                          color: const Color(0xFF00F2FE),
+                          color: AppTheme.accentCyan,
                           onTap: () {
                             if (!state.isOn) led.togglePower(true);
                             led.setBrightness(100);
@@ -904,10 +888,10 @@ class _ActionCard3D extends StatelessWidget {
                   ),
                 ),
               ),
-              Icon(
+              const Icon(
                 Icons.arrow_forward_ios_rounded,
                 size: 11,
-                color: Colors.white.withValues(alpha: 0.25),
+                color: AppTheme.textTertiary,
               ),
             ],
           ),
@@ -967,7 +951,7 @@ class _GemstoneColor3D extends StatelessWidget {
                   stops: const [0.0, 0.4, 1.0],
                 ),
                 border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.4),
+                  color: const Color(0xFF94A3B8),
                   width: 1.5,
                 ),
                 boxShadow: [
@@ -1043,10 +1027,10 @@ class _SceneCard extends StatelessWidget {
                   ),
                   child: Icon(icon, color: color, size: 16),
                 ),
-                Icon(
+                const Icon(
                   Icons.arrow_forward_ios_rounded,
                   size: 11,
-                  color: Colors.white.withValues(alpha: 0.35),
+                  color: AppTheme.textTertiary,
                 ),
               ],
             ),
@@ -1123,14 +1107,9 @@ class _GlowingBulb3DState extends State<_GlowingBulb3D>
         height: 58,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          gradient: LinearGradient(
-            colors: [
-              Colors.white.withValues(alpha: 0.12),
-              Colors.white.withValues(alpha: 0.04),
-            ],
-          ),
+          color: const Color(0xFFF1F5F9),
           border: Border.all(
-            color: Colors.white.withValues(alpha: 0.15),
+            color: const Color(0xFFCBD5E1),
             width: 1.5,
           ),
         ),
@@ -1146,9 +1125,10 @@ class _GlowingBulb3DState extends State<_GlowingBulb3D>
       animation: _pulseCtrl,
       builder: (context, _) {
         final t = _pulseCtrl.value;
-        final blur = 18.0 + (t * 12.0);
-        final spread = 1.0 + (t * 2.5);
-        final glowAlpha = 0.45 + (t * 0.30);
+        final blur = 14.0 + (t * 10.0);
+        final spread = 1.0 + (t * 2.0);
+        final glowAlpha = 0.35 + (t * 0.25);
+        final isVeryLight = widget.color.computeLuminance() > 0.72;
 
         return Container(
           width: 58,
@@ -1160,24 +1140,25 @@ class _GlowingBulb3DState extends State<_GlowingBulb3D>
               end: Alignment.bottomRight,
               colors: [
                 widget.color,
-                widget.color.withValues(alpha: 0.65),
+                Color.lerp(widget.color, const Color(0xFF0F172A), 0.18)!,
               ],
             ),
             boxShadow: [
               BoxShadow(
-                color: widget.color.withValues(alpha: glowAlpha),
+                color: (isVeryLight ? AppTheme.accentCyan : widget.color)
+                    .withValues(alpha: glowAlpha),
                 blurRadius: blur,
                 spreadRadius: spread,
               ),
             ],
             border: Border.all(
-              color: Colors.white.withValues(alpha: 0.7),
-              width: 1.8,
+              color: const Color(0xFF64748B),
+              width: 1.6,
             ),
           ),
-          child: const Icon(
+          child: Icon(
             Icons.lightbulb_rounded,
-            color: Colors.white,
+            color: isVeryLight ? const Color(0xFF0F172A) : Colors.white,
             size: 30,
           ),
         );

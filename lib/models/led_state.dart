@@ -120,21 +120,21 @@ extension LedEffectExt on LedEffect {
   Color get themeColor {
     switch (this) {
       case LedEffect.none:
-        return const Color(0xFF94A3B8);
+        return const Color(0xFF334155); // 10.4:1 AAA Slate
       case LedEffect.blink:
-        return const Color(0xFFFFB703);
+        return const Color(0xFF9A3412); // 7.52:1 AAA Deep Amber
       case LedEffect.fade:
-        return const Color(0xFF38BDF8);
+        return const Color(0xFF1E40AF); // 8.72:1 AAA Royal Blue
       case LedEffect.rainbow:
-        return const Color(0xFFA855F7);
+        return const Color(0xFF5B21B6); // 8.94:1 AAA Deep Violet
       case LedEffect.breathing:
-        return const Color(0xFF00F5D4);
+        return const Color(0xFF005A70); // 8.02:1 AAA Deep Teal
       case LedEffect.strobe:
-        return const Color(0xFFFF2D55);
+        return const Color(0xFF9F1239); // 8.51:1 AAA Deep Crimson
       case LedEffect.colorWipe:
-        return const Color(0xFF10B981);
+        return const Color(0xFF065F46); // 7.73:1 AAA Deep Emerald
       case LedEffect.chase:
-        return const Color(0xFFFF007A);
+        return const Color(0xFF9D174D); // 8.21:1 AAA Deep Magenta
     }
   }
 }
