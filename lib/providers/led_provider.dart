@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import '../models/led_state.dart';
 import '../models/sensor_data.dart';
 import '../services/mqtt_service.dart';
+import '../services/storage_service.dart';
 
 class LedProvider extends ChangeNotifier {
   final MqttService _mqttService;
+  final StorageService _storage = StorageService();
   LedState _ledState = const LedState(numLeds: 8);
   SensorData _sensorData = SensorData();
   bool _autoMode = false;
@@ -69,13 +71,15 @@ class LedProvider extends ChangeNotifier {
     _motionSub = _mqttService.subscribe(config.sensorMotionTopic).listen((data) {
       try {
         final json = jsonDecode(data);
+        final detected = json['detected'] as bool? ?? false;
         _sensorData = _sensorData.copyWith(
-          motionDetected: json['detected'] as bool? ?? false,
+          motionDetected: detected,
           timestamp: DateTime.now(),
         );
 
-        if (_autoMode && json['detected'] == true && !_ledState.isOn) {
-          togglePower(true);
+        if (_autoMode && detected && !_ledState.isOn) {
+          // Reflect power state in UI without disabling _autoMode or sending manual power override
+          _ledState = _ledState.copyWith(isOn: true);
         }
         notifyListeners();
       } catch (e) {
@@ -114,13 +118,19 @@ class LedProvider extends ChangeNotifier {
     } else {
       brightness = 20;
     }
-    setBrightness(brightness);
+    // Update UI brightness reflection without calling _ensureManualPowerOn() which turns off _autoMode!
+    if (_ledState.brightness != brightness) {
+      _ledState = _ledState.copyWith(brightness: brightness);
+    }
   }
 
   /// Ensures ESP32 exits autoMode and turns on ledPower when user manually adjusts color/brightness/effect
   void _ensureManualPowerOn() {
     if (!_ledState.isOn || _autoMode) {
-      _autoMode = false;
+      if (_autoMode) {
+        _autoMode = false;
+        unawaited(_storage.saveAutoMode(false));
+      }
       _ledState = _ledState.copyWith(isOn: true);
       _mqttService.publish(
         _mqttService.config.powerTopic,
@@ -130,8 +140,9 @@ class LedProvider extends ChangeNotifier {
   }
 
   void togglePower(bool on) {
-    if (on) {
+    if (_autoMode) {
       _autoMode = false;
+      unawaited(_storage.saveAutoMode(false));
     }
     _ledState = _ledState.copyWith(isOn: on);
     _mqttService.publish(
@@ -183,6 +194,7 @@ class LedProvider extends ChangeNotifier {
 
   void setAutoMode(bool enabled) {
     _autoMode = enabled;
+    unawaited(_storage.saveAutoMode(enabled));
     _mqttService.publish(
       _mqttService.config.autoModeTopic,
       {'enabled': enabled},
@@ -192,6 +204,7 @@ class LedProvider extends ChangeNotifier {
 
   void setNumLeds(int count) {
     _ledState = _ledState.copyWith(numLeds: count.clamp(1, 300));
+    unawaited(_storage.saveNumLeds(_ledState.numLeds));
     _mqttService.publish(
       _mqttService.config.numLedsTopic,
       {'count': _ledState.numLeds},
@@ -201,7 +214,10 @@ class LedProvider extends ChangeNotifier {
 
   /// Sends a quick hardware test signal to ESP32 (Power ON + Cyan color + 100% brightness)
   void sendHardwareTestPing() {
-    _autoMode = false;
+    if (_autoMode) {
+      _autoMode = false;
+      unawaited(_storage.saveAutoMode(false));
+    }
     _ledState = _ledState.copyWith(
       isOn: true,
       color: const Color(0xFF00F5D4),
@@ -261,8 +277,9 @@ class LedProvider extends ChangeNotifier {
       setAutoMode(false);
     }
 
-    // Ensure power is ON first on ESP32 before applying color/brightness/effect
-    if (!hasPowerCmd &&
+    // Ensure power is ON first on ESP32 before applying manual color/brightness/effect
+    if (!hasAutoModeTrue &&
+        !hasPowerCmd &&
         (hasColorCmd ||
             hasEffectCmd ||
             commands.any((c) => c['action'] == 'brightness')) &&
@@ -271,14 +288,22 @@ class LedProvider extends ChangeNotifier {
     }
 
     // If user asks for a specific color without specifying an effect, clear rainbow/strobe
-    if (hasColorCmd &&
+    if (!hasAutoModeTrue &&
+        hasColorCmd &&
         !hasEffectCmd &&
         (_ledState.effect == LedEffect.rainbow ||
             _ledState.effect == LedEffect.strobe)) {
       setEffect(LedEffect.none);
     }
 
-    for (final cmd in commands) {
+    // If auto_mode is being enabled, only run auto_mode and num_leds commands so manual commands don't immediately cancel auto_mode
+    final filteredCommands = hasAutoModeTrue
+        ? commands
+            .where((c) => c['action'] == 'auto_mode' || c['action'] == 'num_leds')
+            .toList()
+        : commands;
+
+    for (final cmd in filteredCommands) {
       executeCommand(cmd);
     }
   }

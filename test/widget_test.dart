@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:smart_led_control/models/chat_message.dart';
 import 'package:smart_led_control/models/led_state.dart';
 import 'package:smart_led_control/models/mqtt_config.dart';
@@ -13,6 +14,7 @@ import 'package:smart_led_control/utils/pronunciation_helper.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  SharedPreferences.setMockInitialValues({});
 
   test('LedProvider.executeCommands updates multi-action LED state properly', () {
     final mqtt = MqttService();
@@ -39,6 +41,19 @@ void main() {
 
     provider.restoreSavedState(numLeds: 16, autoMode: true);
     expect(provider.ledState.numLeds, equals(16));
+    expect(provider.autoMode, isTrue);
+  });
+
+  test('LedProvider autoMode stays ON when executeCommands receives auto_mode true alongside manual commands', () {
+    final mqtt = MqttService();
+    final provider = LedProvider(mqtt);
+
+    provider.executeCommands([
+      {'action': 'power', 'state': 'on'},
+      {'action': 'auto_mode', 'enabled': true},
+      {'action': 'brightness', 'value': 80},
+    ]);
+
     expect(provider.autoMode, isTrue);
   });
 

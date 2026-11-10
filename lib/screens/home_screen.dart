@@ -36,6 +36,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       const SensorScreen(),
     ];
 
+    final isKeyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+
     return Scaffold(
       extendBody: true,
       backgroundColor: Colors.transparent,
@@ -45,10 +47,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           children: screens,
         ),
       ),
-      bottomNavigationBar: _LiquidFloatingNavBar(
-        currentIndex: _currentIndex,
-        onTap: _onSelectTab,
-      ),
+      bottomNavigationBar: isKeyboardOpen
+          ? null
+          : _LiquidFloatingNavBar(
+              currentIndex: _currentIndex,
+              onTap: _onSelectTab,
+            ),
     );
   }
 }

@@ -1,4 +1,4 @@
-// ESP32 room light with MQTT control. ArduinoJson 7 required.
+// ESP32 room light with MQTT & Google Home (Sinric Pro) control. ArduinoJson 7 required.
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
@@ -8,6 +8,11 @@
 #include <DHT.h>
 #include <Adafruit_NeoPixel.h>
 #include <math.h>
+
+// Tích hợp Google Home qua Sinric Pro
+#include <SinricPro.h>
+#include <SinricProLight.h>
+#define HAS_SINRIC_PRO 1
 
 // =====================================
 // 1. KHAI BAO CHAN
@@ -484,18 +489,30 @@ void printDebug(unsigned long now) {
     Serial.println(" s");
   }
 
+  #if HAS_SINRIC_PRO
+  Serial.print("Google Home (SinricPro): ");
+  Serial.println(SinricPro.isConnected() ? "ONLINE" : "CONNECTING/OFFLINE");
+  #else
+  Serial.println("Google Home (SinricPro): CHUA CAI THU VIEN SinricPro TRONG ARDUINO IDE!");
+  #endif
+
   Serial.println("========================");
 }
 
 // =====================================
-// 14. SETUP
+// 14. SETUP WIFI, MQTT & GOOGLE HOME (SINRIC PRO)
 // =====================================
 
-const char* WIFI_SSID = "TP-Link_24AC";          // Đổi thành tên WiFi
-const char* WIFI_PASSWORD = "18289152";    // Đổi thành mật khẩu WiFi
+const char* WIFI_SSID = "Thang";          // Đổi thành tên WiFi
+const char* WIFI_PASSWORD = "11111111";    // Đổi thành mật khẩu WiFi
 const char* MQTT_BROKER = "broker.hivemq.com";
 const int MQTT_PORT = 1883;
 const char* MQTT_CLIENT_ID = "smart_led_esp32";
+
+// --- CẤU HÌNH GOOGLE HOME QUA SINRIC PRO (https://portal.sinric.pro) ---
+const char* SINRIC_APP_KEY    = "67b63b2e-793e-480c-abfa-7b33d43fc19d";      // Lấy ở mục Credentials -> App Key
+const char* SINRIC_APP_SECRET = "daede969-1801-4cb1-a3d3-2c2d7e0212b2-6a0ef29f-0bd4-4d37-a8b9-808ffbbcc112";   // Lấy ở mục Credentials -> App Secret
+const char* SINRIC_LIGHT_ID   = "6af09dd99ea140585c9cecb5";    // Lấy ở mục Devices -> Device ID (Smart Light Bulb)
 
 const char* TOPIC_PREFIX = "smart_led";
 String topicColor;
@@ -562,6 +579,162 @@ void publishSensors(unsigned long now) {
   mqttClient.publish((String(TOPIC_PREFIX) + "/sensor/climate").c_str(), json.c_str());
 }
 
+// =====================================
+// 15. XỬ LÝ LỆNH TỪ GOOGLE HOME (SINRIC PRO)
+// =====================================
+#if HAS_SINRIC_PRO
+bool sinricStarted = false;
+
+bool isSinricConfigured() {
+  return strlen(SINRIC_APP_KEY) > 10 &&
+         strlen(SINRIC_APP_SECRET) > 10 &&
+         strlen(SINRIC_LIGHT_ID) > 10 &&
+         String(SINRIC_APP_KEY) != "DAN_APP_KEY_VAO_DAY";
+}
+
+// 1. Khi nói: "Ok Google, bật/tắt đèn thông minh"
+bool onSinricPowerState(const String &deviceId, bool &state) {
+  autoMode = false;
+  lightActive = false;
+  currentR = currentG = currentB = 0;
+  ledPower = state;
+  strip.setBrightness(map(ledBrightness, 0, 100, 0, MAX_LED_LEVEL));
+  effectStep = 0;
+  effectDirection = true;
+  lastEffectUpdate = millis();
+  if (ledPower) {
+    setAllLeds(ledR, ledG, ledB);
+  } else {
+    clearLeds();
+  }
+  Serial.printf("[Google Home] Nguồn: %s\n", state ? "BẬT" : "TẮT");
+  return true;
+}
+
+// 2. Khi nói: "Ok Google, chỉnh độ sáng đèn 50%"
+bool onSinricBrightness(const String &deviceId, int &brightness) {
+  autoMode = false;
+  lightActive = false;
+  ledBrightness = constrain(brightness, 0, 100);
+  ledPower = (ledBrightness > 0);
+  strip.setBrightness(map(ledBrightness, 0, 100, 0, MAX_LED_LEVEL));
+  if (ledPower) {
+    setAllLeds(ledR, ledG, ledB);
+  } else {
+    clearLeds();
+  }
+  Serial.printf("[Google Home] Độ sáng: %d%%\n", ledBrightness);
+  return true;
+}
+
+// 3. Khi nói: "Ok Google, tăng/giảm độ sáng đèn"
+bool onSinricAdjustBrightness(const String &deviceId, int &brightnessDelta) {
+  autoMode = false;
+  lightActive = false;
+  ledBrightness = constrain(ledBrightness + brightnessDelta, 0, 100);
+  brightnessDelta = ledBrightness;
+  ledPower = (ledBrightness > 0);
+  strip.setBrightness(map(ledBrightness, 0, 100, 0, MAX_LED_LEVEL));
+  if (ledPower) {
+    setAllLeds(ledR, ledG, ledB);
+  } else {
+    clearLeds();
+  }
+  Serial.printf("[Google Home] Điều chỉnh độ sáng: %d%%\n", ledBrightness);
+  return true;
+}
+
+// 4. Khi nói: "Ok Google, đổi màu đèn sang màu đỏ/xanh/tím..."
+bool onSinricColor(const String &deviceId, byte &r, byte &g, byte &b) {
+  autoMode = false;
+  lightActive = false;
+  ledPower = true;
+  currentEffect = "none";
+  ledR = r;
+  ledG = g;
+  ledB = b;
+  strip.setBrightness(map(ledBrightness, 0, 100, 0, MAX_LED_LEVEL));
+  setAllLeds(ledR, ledG, ledB);
+  Serial.printf("[Google Home] Màu RGB: (%d, %d, %d)\n", r, g, b);
+  return true;
+}
+
+// 5. Khi nói: "Ok Google, đổi sang màu trắng / trắng ấm / ánh sáng ban ngày..."
+// Google Home gửi lệnh ColorTemperature (Kelvin: 2200K - 9000K) thay vì RGB!
+bool onSinricColorTemperature(const String &deviceId, int &colorTemperature) {
+  autoMode = false;
+  lightActive = false;
+  ledPower = true;
+  currentEffect = "none";
+
+  // Chuyển đổi độ K (Kelvin) sang RGB tương ứng:
+  if (colorTemperature <= 3000) {
+    // Trắng ấm / Vàng ấm (Warm White)
+    ledR = 255;
+    ledG = 190;
+    ledB = 120;
+  } else if (colorTemperature >= 5500) {
+    // Trắng mát / Ánh sáng ban ngày (Cool White / Daylight)
+    ledR = 255;
+    ledG = 255;
+    ledB = 255;
+  } else {
+    // Trắng tự nhiên (Pure White ~ 4000K)
+    ledR = 255;
+    ledG = 255;
+    ledB = 255;
+  }
+
+  strip.setBrightness(map(ledBrightness, 0, 100, 0, MAX_LED_LEVEL));
+  setAllLeds(ledR, ledG, ledB);
+
+  // Đồng bộ ngược lại mã RGB (255, 255, 255) lên Sinric Pro để không bị hiển thị R:-1, G:-1, B:-1
+  SinricProLight &myLight = SinricPro[SINRIC_LIGHT_ID];
+  myLight.sendColorEvent(ledR, ledG, ledB);
+
+  Serial.printf("[Google Home] Nhiệt độ màu Trắng (%dK) -> RGB: (%d, %d, %d)\n",
+                colorTemperature, ledR, ledG, ledB);
+  return true;
+}
+
+// 6. Khi nói: "Ok Google, chỉnh đèn ấm hơn / lạnh hơn"
+bool onSinricIncreaseColorTemperature(const String &deviceId, int &colorTemperature) {
+  colorTemperature = 6500;
+  return onSinricColorTemperature(deviceId, colorTemperature);
+}
+
+bool onSinricDecreaseColorTemperature(const String &deviceId, int &colorTemperature) {
+  colorTemperature = 2700;
+  return onSinricColorTemperature(deviceId, colorTemperature);
+}
+
+void setupSinricPro() {
+  if (!isSinricConfigured() || sinricStarted) {
+    return;
+  }
+  SinricProLight &myLight = SinricPro[SINRIC_LIGHT_ID];
+  myLight.onPowerState(onSinricPowerState);
+  myLight.onBrightness(onSinricBrightness);
+  myLight.onAdjustBrightness(onSinricAdjustBrightness);
+  myLight.onColor(onSinricColor);
+  myLight.onColorTemperature(onSinricColorTemperature);
+  myLight.onIncreaseColorTemperature(onSinricIncreaseColorTemperature);
+  myLight.onDecreaseColorTemperature(onSinricDecreaseColorTemperature);
+
+  SinricPro.onConnected([]() {
+    Serial.println("[SinricPro] Đã kết nối tới Google Home Cloud!");
+  });
+  SinricPro.onDisconnected([]() {
+    Serial.println("[SinricPro] Mất kết nối Google Home Cloud.");
+  });
+
+  SinricPro.restoreDeviceStates(true);
+  SinricPro.begin(SINRIC_APP_KEY, SINRIC_APP_SECRET);
+  sinricStarted = true;
+  Serial.println("[SinricPro] Đang khởi tạo kết nối WebSocket tới SinricPro...");
+}
+#endif
+
 void setup() {
   Serial.begin(115200);
   bootTime = millis();
@@ -616,6 +789,14 @@ void loop() {
     else if (!mqttClient.connected()) connectMQTT();
   }
   if (mqttClient.connected()) mqttClient.loop();
+  #if HAS_SINRIC_PRO
+  if (WiFi.status() == WL_CONNECTED && isSinricConfigured()) {
+    if (!sinricStarted) {
+      setupSinricPro();
+    }
+    SinricPro.handle();
+  }
+  #endif
   publishSensors(millis());
 }
 

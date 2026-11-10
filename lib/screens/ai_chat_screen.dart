@@ -386,23 +386,33 @@ class _AiChatScreenState extends State<AiChatScreen>
 
   /// Records 16kHz 16-bit Mono PCM directly from the hardware microphone using `AudioRecorder`
   /// and transcribes + processes Vietnamese speech via Gemini Multimodal Audio.
-  Future<void> _startDirectAudioRecording() async {
+  Future<void> _startDirectAudioRecording({bool fallbackDone = false}) async {
     try {
-      final hasPerm = await _audioRecorder.hasPermission();
+      bool hasPerm = false;
+      try {
+        hasPerm = await _audioRecorder.hasPermission();
+      } catch (e) {
+        debugPrint('hasPermission check error: $e');
+      }
+
       if (!hasPerm) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text(
-              'Vui lòng cấp quyền Micro (Ghi âm) cho ứng dụng để nói chuyện bằng giọng nói.',
+        // Try SpeechToText permission check as secondary verification in case record plugin check fails
+        final speechPerm = await _speech.hasPermission;
+        if (!speechPerm) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text(
+                'Vui lòng cấp quyền Micro (Ghi âm) cho ứng dụng để nói chuyện bằng giọng nói.',
+              ),
+              backgroundColor: AppTheme.accentOrange,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
             ),
-            backgroundColor: AppTheme.accentOrange,
-            behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-        );
-        return;
+          );
+          return;
+        }
       }
 
       await _directRecordSub?.cancel();
@@ -505,6 +515,9 @@ class _AiChatScreenState extends State<AiChatScreen>
           _isRecordingDirectAudio = false;
           _isListening = false;
         });
+      }
+      if (!fallbackDone) {
+        await _startDeviceListening(fallbackDone: true);
       }
     }
   }
@@ -784,7 +797,7 @@ class _AiChatScreenState extends State<AiChatScreen>
     return wav;
   }
 
-  Future<void> _startDeviceListening() async {
+  Future<void> _startDeviceListening({bool fallbackDone = false}) async {
     try {
       if (!_speechAvailable) {
         _speechAvailable = await _speech.initialize(
@@ -809,8 +822,22 @@ class _AiChatScreenState extends State<AiChatScreen>
       }
 
       if (!_speechAvailable) {
-        // Fallback to direct hardware microphone recorder if SpeechRecognizer is unavailable
-        await _startDirectAudioRecording();
+        if (!fallbackDone) {
+          // Fallback to direct hardware microphone recorder if SpeechRecognizer is unavailable
+          await _startDirectAudioRecording(fallbackDone: true);
+        } else if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text(
+                'Vui lòng nhập Gemini API Key trong mục Cài đặt hoặc bật Google Voice Typing trên máy để dùng giọng nói.',
+              ),
+              backgroundColor: AppTheme.accentOrange,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+          );
+        }
         return;
       }
 
@@ -847,7 +874,9 @@ class _AiChatScreenState extends State<AiChatScreen>
       );
     } catch (e) {
       debugPrint('Error starting speech recognition, falling back to audio recorder: $e');
-      await _startDirectAudioRecording();
+      if (!fallbackDone) {
+        await _startDirectAudioRecording(fallbackDone: true);
+      }
     }
   }
 
@@ -1278,7 +1307,8 @@ class _AiChatScreenState extends State<AiChatScreen>
     final ledState = ledProvider.ledState;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final isKeyboardOpen = bottomInset > 0;
-    final bottomPad = isKeyboardOpen ? 8.0 : 86.0;
+    // When SafeArea(bottom: true) is used with extendBody: true, SafeArea already pads by the bottomNavigationBar height (78px)!
+    final bottomPad = isKeyboardOpen ? 8.0 : 8.0;
 
     return SafeArea(
       child: Column(
@@ -1294,6 +1324,7 @@ class _AiChatScreenState extends State<AiChatScreen>
           Expanded(
             child: ListView.builder(
               controller: _scrollController,
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               padding: const EdgeInsets.fromLTRB(14, 6, 14, 10),
               itemCount: _messages.length + (_isLoading ? 1 : 0),
               itemBuilder: (context, index) {
@@ -1356,6 +1387,7 @@ class _AiChatScreenState extends State<AiChatScreen>
                 ],
               ),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   // Voice Microphone Button
                   GestureDetector(
@@ -1406,10 +1438,12 @@ class _AiChatScreenState extends State<AiChatScreen>
                   Expanded(
                     child: TextField(
                       controller: _controller,
+                      textAlignVertical: TextAlignVertical.center,
                       style: const TextStyle(
                         color: AppTheme.textPrimary,
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
+                        height: 1.2,
                       ),
                       decoration: InputDecoration(
                         hintText: _isListening
@@ -1418,12 +1452,18 @@ class _AiChatScreenState extends State<AiChatScreen>
                         hintStyle: const TextStyle(
                           color: AppTheme.textTertiary,
                           fontSize: 13.5,
+                          height: 1.2,
                         ),
+                        filled: false,
                         border: InputBorder.none,
-                        isDense: true,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        errorBorder: InputBorder.none,
+                        disabledBorder: InputBorder.none,
+                        isCollapsed: true,
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 6,
-                          vertical: 10,
+                          vertical: 11,
                         ),
                       ),
                       onSubmitted: (_) => _sendMessage(),
@@ -2066,6 +2106,20 @@ class _ChatBubbleState extends State<_ChatBubble> {
       _startTypewriter();
     } else {
       _displayedText = widget.message.content;
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _ChatBubble oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.message.content != widget.message.content) {
+      if (widget.shouldStreamText && !widget.message.isUser) {
+        _startTypewriter();
+      } else {
+        _typewriterTimer?.cancel();
+        _isStreaming = false;
+        _displayedText = widget.message.content;
+      }
     }
   }
 
